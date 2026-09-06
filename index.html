@@ -115,7 +115,7 @@
     }
 
     // --- コンポーネント群 ---
-    const Card=({children,className=""})=><section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${className}`}>{children}</section>;
+    const Card=({children,className=""})=><section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm min-w-0 ${className}`}>{children}</section>;
     const Stat=({label,value,tone=""})=><div className={`rounded-2xl p-4 shadow-sm ${tone||"border border-slate-200 bg-white"}`}><p className="text-sm opacity-70">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>;
     const Money=({value,onChange,small=false})=><input type="number" min="0" inputMode="numeric" value={value??""} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>onChange(e.target.value)} className={`${small?"w-28":"w-36"} rounded-lg border border-slate-300 bg-white px-3 py-2 text-right font-semibold outline-none focus:border-indigo-500`}/>;
     const SignedMoney=({value,onChange,small=false})=><input type="number" inputMode="decimal" value={value??""} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>onChange(e.target.value)} className={`${small?"w-28":"w-36"} rounded-lg border border-slate-300 bg-white px-3 py-2 text-right font-semibold outline-none focus:border-indigo-500`}/>;
@@ -430,16 +430,16 @@
         return node;
       });
 
-      return <div className="flex flex-col items-center gap-4 sm:flex-row">
-        <svg viewBox="0 0 42 42" className="h-44 w-44 -rotate-90">
+      return <div className="flex flex-col items-center gap-4 sm:flex-row min-w-0 max-w-full">
+        <svg viewBox="0 0 42 42" className="h-36 w-36 flex-shrink-0 -rotate-90 sm:h-44 sm:w-44">
           <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e2e8f0" strokeWidth="7"/>
           {segments}
           <circle cx="21" cy="21" r="10" fill="white"/>
           <text x="21" y="20" textAnchor="middle" className="fill-slate-600 text-[3px] rotate-90 origin-center">{title}</text>
           <text x="21" y="24" textAnchor="middle" className="fill-slate-900 text-[3px] font-bold rotate-90 origin-center">{yen(total)}</text>
         </svg>
-        <div className="w-full space-y-2">
-          {rows.map((x,index)=><div key={x.id||index} className="flex items-center justify-between gap-3 text-sm"><span className="flex items-center gap-2"><i className="h-3 w-3 rounded-full" style={{background:colors[index%colors.length]}}/>{x.name}</span><strong>{(x.amount/total*100).toFixed(1)}% ({yen(x.amount)})</strong></div>)}
+        <div className="w-full space-y-2 min-w-0">
+          {rows.map((x,index)=><div key={x.id||index} className="flex items-center justify-between gap-2 text-xs sm:text-sm"><span className="flex items-center gap-1.5 min-w-0 truncate"><i className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{background:colors[index%colors.length]}}/><span className="truncate">{x.name}</span></span><strong className="flex-shrink-0 ml-1">{(x.amount/total*100).toFixed(1)}% ({yen(x.amount)})</strong></div>)}
         </div>
       </div>
     }
@@ -450,41 +450,50 @@
       const maxVal=Math.max(...values,1);
       const minVal=hasNegative?Math.min(...values,0):0;
       const range=hasNegative?(maxVal-minVal)||1:maxVal;
+      const minChartWidth = data.length > 5 ? `${Math.max(data.length * 44, 380)}px` : "100%";
 
       if(!hasNegative){
-        return <div className="mt-4 flex h-44 items-end gap-2 border-b border-slate-200 px-1 overflow-x-auto">
-          {data.map(x=>(
-            <div key={x.label} className="flex min-w-8 flex-1 flex-col items-center justify-end gap-1">
-              <span className="text-[10px] text-slate-500">{signed?signedYen(x.value):yen(x.value)}</span>
-              <div title={`${x.label}: ${signed?signedYen(x.value):yen(x.value)}`} className={`w-full max-w-10 rounded-t ${color}`} style={{height:`${Math.max(x.value/maxVal*130,2)}px`}}/>
-              <span className="whitespace-nowrap text-[10px] text-slate-500">{x.label.length > 5 ? x.label.slice(5).replace("-","/") : x.label}</span>
+        return (
+          <div className="mt-4 w-full max-w-full overflow-x-auto pb-1">
+            <div className="flex h-44 items-end gap-2 border-b border-slate-200 px-1" style={{minWidth: minChartWidth}}>
+              {data.map(x=>(
+                <div key={x.label} className="flex min-w-7 flex-1 flex-col items-center justify-end gap-1">
+                  <span className="text-[10px] text-slate-500 whitespace-nowrap">{signed?signedYen(x.value):yen(x.value)}</span>
+                  <div title={`${x.label}: ${signed?signedYen(x.value):yen(x.value)}`} className={`w-full max-w-8 sm:max-w-10 rounded-t ${color}`} style={{height:`${Math.max(x.value/maxVal*130,2)}px`}}/>
+                  <span className="whitespace-nowrap text-[10px] text-slate-500">{x.label.length > 5 ? x.label.slice(5).replace("-","/") : x.label}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>;
+          </div>
+        );
       }
 
       // 負数を含む場合のゼロライン付きレイアウト
       const zeroPos=(maxVal/range)*110;
-      return <div className="mt-4 flex h-48 items-center gap-2 px-1 overflow-x-auto">
-        {data.map(x=>{
-          const isNeg=x.value<0;
-          const barH=Math.max(Math.abs(x.value)/range*110,2);
-          return (
-            <div key={x.label} className="flex min-w-8 flex-1 flex-col items-center justify-between h-full py-1">
-              <span className={`text-[10px] ${isNeg?"font-bold text-rose-600":"font-semibold text-slate-600"}`}>{signedYen(x.value)}</span>
-              <div className="relative w-full h-[110px] flex items-center justify-center">
-                <div className="absolute w-full border-t border-slate-300" style={{top:`${zeroPos}px`}}/>
-                <div
-                  title={`${x.label}: ${signedYen(x.value)}`}
-                  className={`absolute w-full max-w-7 ${isNeg?"bg-rose-500 rounded-b":"bg-indigo-500 rounded-t"}`}
-                  style={isNeg?{top:`${zeroPos}px`,height:`${barH}px`}:{bottom:`${110-zeroPos}px`,height:`${barH}px`}}
-                />
-              </div>
-              <span className="whitespace-nowrap text-[10px] text-slate-500">{x.label.length > 5 ? x.label.slice(5).replace("-","/") : x.label}</span>
-            </div>
-          );
-        })}
-      </div>;
+      return (
+        <div className="mt-4 w-full max-w-full overflow-x-auto pb-1">
+          <div className="flex h-48 items-center gap-2 px-1" style={{minWidth: minChartWidth}}>
+            {data.map(x=>{
+              const isNeg=x.value<0;
+              const barH=Math.max(Math.abs(x.value)/range*110,2);
+              return (
+                <div key={x.label} className="flex min-w-7 flex-1 flex-col items-center justify-between h-full py-1">
+                  <span className={`text-[10px] whitespace-nowrap ${isNeg?"font-bold text-rose-600":"font-semibold text-slate-600"}`}>{signedYen(x.value)}</span>
+                  <div className="relative w-full h-[110px] flex items-center justify-center">
+                    <div className="absolute w-full border-t border-slate-300" style={{top:`${zeroPos}px`}}/>
+                    <div
+                      title={`${x.label}: ${signedYen(x.value)}`}
+                      className={`absolute w-full max-w-7 sm:max-w-8 ${isNeg?"bg-rose-500 rounded-b":"bg-indigo-500 rounded-t"}`}
+                      style={isNeg?{top:`${zeroPos}px`,height:`${barH}px`}:{bottom:`${110-zeroPos}px`,height:`${barH}px`}}
+                    />
+                  </div>
+                  <span className="whitespace-nowrap text-[10px] text-slate-500">{x.label.length > 5 ? x.label.slice(5).replace("-","/") : x.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
     }
 
     // --- 3. 分析ダッシュボード ---
@@ -568,7 +577,7 @@
             {unpaidMonths.length>0&&<p className="mt-3 font-semibold text-rose-600 text-sm">未回収月: {unpaidMonths.join("、")}</p>}
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 min-w-0">
             <Card className="overflow-hidden p-0"><div className="p-4"><h3 className="font-bold">カテゴリ別精算実績</h3></div>
             <div className="overflow-x-auto"><table className="w-full min-w-[500px] text-sm"><thead className="bg-slate-50 text-left text-slate-500"><tr><th className="px-4 py-3">カテゴリ</th><th>予算</th><th>実績合計</th><th className="px-4">予算達成率</th></tr></thead><tbody className="divide-y divide-slate-100">{categoryRows.map(c=>{const rate=c.budget?c.average/c.budget*100:0;return <tr key={c.id}><td className="px-4 py-3 font-medium">{c.name}</td><td>{yen(c.budget)}</td><td>{yen(c.amount)}</td><td className={`px-4 font-bold ${rate>100?"text-rose-600":"text-emerald-600"}`}>{rate.toFixed(0)}%</td></tr>})}</tbody></table></div></Card>
             <Card><h3 className="font-bold">カテゴリ別生活費割合</h3><Donut rows={categoryRows}/></Card>
@@ -599,12 +608,12 @@
             </Card>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 min-w-0">
             <Card><h3 className="font-bold">月間純貯蓄（収支）の推移</h3><Chart data={netChart} color="bg-indigo-500" signed/></Card>
             <Card><h3 className="font-bold">総資産ポートフォリオ</h3><Donut rows={assetPortfolio} title="資産構成"/></Card>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 min-w-0">
             <Card><h3 className="font-bold">収入推移</h3><Chart data={incomeChart} color="bg-emerald-500"/></Card>
             <Card><h3 className="font-bold">支出推移（固定費+臨時出費）</h3><Chart data={spendingChart} color="bg-rose-500"/></Card>
           </div>
