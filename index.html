@@ -17,28 +17,51 @@
 <body class="text-slate-800">
   <div id="root"></div>
 
+  <!-- ローカル設定ファイル（存在する場合のみ読み込まれます。GitHubにはコミットされません） -->
+  <script src="firebase-config.js" onerror="/* 静的ホスティング等でファイルがない場合は無視 */"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDKqUfjDofZhvhq-yq3zA0yOUQ5yLfOowc",
-      authDomain: "kurashi-kakeityou.firebaseapp.com",
-      projectId: "kurashi-kakeityou",
-      storageBucket: "kurashi-kakeityou.firebasestorage.app",
-      messagingSenderId: "678670753801",
-      appId: "1:678670753801:web:0d892729720f0a059bd8d8",
-      measurementId: "G-JD8SC8YS5Z"
+    // 接続設定の取得（window.FIREBASE_CONFIG または ブラウザのlocalStorageから）
+    function getStoredFirebaseConfig() {
+      if (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && window.FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY") {
+        return window.FIREBASE_CONFIG;
+      }
+      try {
+        const stored = localStorage.getItem("kakeibo_firebase_config");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.apiKey) return parsed;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    window.initFirebase = (config) => {
+      try {
+        const app = initializeApp(config);
+        const db = getFirestore(app);
+        window.firebaseDb = db;
+        window.firebaseDoc = doc;
+        window.firebaseGetDoc = getDoc;
+        window.firebaseSetDoc = setDoc;
+        window.currentFirebaseConfig = config;
+        window.firebaseNeedsConfig = false;
+        return true;
+      } catch (err) {
+        console.error("Firebase初期化エラー:", err);
+        return false;
+      }
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // React側から触れるようにWindowオブジェクトにエクスポート
-    window.firebaseDb = db;
-    window.firebaseDoc = doc;
-    window.firebaseGetDoc = getDoc;
-    window.firebaseSetDoc = setDoc;
+    const initialConfig = getStoredFirebaseConfig();
+    if (initialConfig) {
+      window.initFirebase(initialConfig);
+    } else {
+      window.firebaseNeedsConfig = true;
+    }
   </script>
 
   <script type="text/babel">
@@ -264,6 +287,88 @@
           </div>
         </div>
       </div>
+    }
+
+    // --- Firebase接続設定モーダル ---
+    function FirebaseConfigModal({isOpen,onClose,onSave,canClose=true}){
+      const [rawJson, setRawJson]=useState("");
+      const [error, setError]=useState("");
+
+      if(!isOpen) return null;
+
+      const handlePasteExtract=()=>{
+        try {
+          setError("");
+          let text = rawJson.trim();
+          if(!text) return setError("設定テキストを入力してください。");
+
+          if(text.includes("{") && text.includes("}")){
+            const start = text.indexOf("{");
+            const end = text.lastIndexOf("}");
+            text = text.substring(start, end + 1);
+          }
+
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch(e) {
+            const fn = new Function(`return (${text});`);
+            parsed = fn();
+          }
+
+          if(!parsed || !parsed.apiKey || !parsed.projectId){
+            return setError("apiKey または projectId が見つかりませんでした。設定を確認してください。");
+          }
+
+          onSave(parsed);
+          onClose();
+        } catch(err) {
+          setError("設定の解析に失敗しました。正しいJSONまたは設定スニペットを入力してください。");
+        }
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <span>🔥</span> Firebase クラウド接続設定
+              </h3>
+              {canClose && (
+                <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">✕</button>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Firebase Console の「プロジェクトの設定」＞「マイアプリ（ウェブ）」に表示される <code className="bg-slate-100 px-1 py-0.5 rounded text-indigo-600 font-mono">const firebaseConfig = &#123; ... &#125;</code> の内容をそのまま貼り付けてください。
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">設定スニペット / JSON貼り付け</label>
+              <textarea
+                rows="7"
+                value={rawJson}
+                onChange={e=>setRawJson(e.target.value)}
+                placeholder={`const firebaseConfig = {\n  apiKey: "YOUR_API_KEY",\n  authDomain: "your-app.firebaseapp.com",\n  projectId: "your-app",\n  ...\n};`}
+                className="w-full font-mono text-xs rounded-xl border border-slate-300 p-3 outline-none focus:border-indigo-500 bg-slate-50"
+              />
+              {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
+            </div>
+
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-900 space-y-1">
+              <p className="font-bold">🔒 セキュリティ安心設計</p>
+              <p>入力された設定はお使いのブラウザ内（LocalStorage）にのみ安全に保存され、GitHub等の公開リポジトリには送信・記録されません。</p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              {canClose && (
+                <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">キャンセル</button>
+              )}
+              <button onClick={handlePasteExtract} className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-bold text-white shadow hover:bg-indigo-700">接続して保存</button>
+            </div>
+          </div>
+        </div>
+      );
     }
 
     // --- 2. 資金管理画面 ---
@@ -643,7 +748,7 @@
       return <Card className="overflow-hidden p-0"><div className="flex items-center justify-between p-4"><h3 className="font-bold">{title}</h3><button onClick={onAdd} className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white">＋ 追加</button></div><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-sm"><thead className="bg-slate-50 text-left text-slate-500"><tr>{headers.map(x=><th key={x} className="px-4 py-2">{x}</th>)}<th/></tr></thead><tbody className="divide-y divide-slate-100">{items.map(item=><tr key={item.id}>{cells(item).map((cell,i)=><td key={i} className="px-4 py-2">{cell}</td>)}<td className="px-4 text-right"><button onClick={()=>{if(confirm("この項目をマスタから削除しますか？"))onRemove(item.id);}} className="text-rose-600 hover:underline">削除</button></td></tr>)}</tbody></table></div></Card>
     }
 
-    function Settings({data,setData}){
+    function Settings({data,setData,openConfigModal}){
       const ref=useRef(null);
       
       const edit=(key,id,field,value)=>{
@@ -700,6 +805,26 @@
         <div><h2 className="text-xl font-bold">設定・マスタ管理</h2><p className="mt-1 text-sm text-slate-500">マスタデータ、起算日、エクスポートを管理します。</p></div>
 
         <Card>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold flex items-center gap-2">
+                <span>Firebase クラウド同期</span>
+                <span className={`inline-block h-2.5 w-2.5 rounded-full ${window.firebaseDb ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                {window.firebaseDb ? "クラウド（Firestore）に接続されています。" : "Firebase設定が未設定または初期化エラーです。"}
+              </p>
+            </div>
+            <button
+              onClick={openConfigModal}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-50 shadow-sm"
+            >
+              設定を変更
+            </button>
+          </div>
+        </Card>
+
+        <Card>
           <h3 className="font-bold">バックアップ・データ出力</h3>
           <p className="mt-1 text-sm text-slate-500">定期的なバックアップを推奨します（CSV出力はExcel等で閲覧可能）。</p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -728,13 +853,35 @@
       const [data, setData] = useState(() => normalize(null));
       const [ym, setYm] = useState(nowYM);
       const [tab, setTab] = useState("settlement");
+      const [configModalOpen, setConfigModalOpen] = useState(false);
       const isInitialLoaded = useRef(false);
+
+      const handleSaveFirebaseConfig = (cfg) => {
+        try {
+          localStorage.setItem("kakeibo_firebase_config", JSON.stringify(cfg));
+          if (typeof window.initFirebase === "function") {
+            window.initFirebase(cfg);
+          }
+          setConfigModalOpen(false);
+          window.location.reload();
+        } catch (e) {
+          console.error(e);
+        }
+      };
 
       // 初回Firestoreデータ取得
       useEffect(() => {
         let isMounted = true;
         const fetchInitialData = async () => {
           try {
+            if (window.firebaseNeedsConfig) {
+              if (isMounted) {
+                setIsLoading(false);
+                setConfigModalOpen(true);
+              }
+              return;
+            }
+
             let waitCount = 0;
             while ((!window.firebaseDb || !window.firebaseDoc || !window.firebaseGetDoc) && waitCount < 50) {
               await new Promise(r => setTimeout(r, 100));
@@ -743,7 +890,10 @@
 
             if (!window.firebaseDb) {
               console.error("Firebaseの初期化タイムアウト");
-              if (isMounted) setIsLoading(false);
+              if (isMounted) {
+                setIsLoading(false);
+                setConfigModalOpen(true);
+              }
               return;
             }
 
@@ -883,8 +1033,15 @@
             {tab==="cashflow"&&<Cashflow data={data} m={m} put={put} putMany={putMany} ym={ym} setYm={setYm}/>}
             {tab==="analytics"&&<Analytics data={data} ym={ym} setYm={setYm}/>}
             {tab==="points"&&<Points data={data} setData={setData}/>}
-            {tab==="settings"&&<Settings data={data} setData={setData}/>}
+            {tab==="settings"&&<Settings data={data} setData={setData} openConfigModal={()=>setConfigModalOpen(true)}/>}
           </main>
+
+          <FirebaseConfigModal
+            isOpen={configModalOpen}
+            onClose={()=>setConfigModalOpen(false)}
+            onSave={handleSaveFirebaseConfig}
+            canClose={!!window.firebaseDb}
+          />
         </div>
       );
     }

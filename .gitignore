@@ -1,0 +1,7 @@
+﻿# Firebase secret config
+firebase-config.js
+
+# Local environment / IDE
+.DS_Store
+Thumbs.db
+*.log
