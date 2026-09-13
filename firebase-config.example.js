@@ -1,4 +1,4 @@
-﻿// Firebase初期設定テンプレート
+// Firebase初期設定テンプレート
 // ローカルで動かす場合は、このファイルを 'firebase-config.js' にリネームし、
 // ご自身のFirebaseプロジェクトの設定値を入力してください。
 window.FIREBASE_CONFIG = {

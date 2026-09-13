@@ -1,0 +1,431 @@
+﻿import React, { useRef } from 'react';
+import { Card, Text, Money, Decimal } from '../components/CommonUI.jsx';
+import {
+  n,
+  p,
+  nowYM,
+  normalize,
+  billsFor,
+  generateId,
+  escapeCSV,
+} from '../utils/calculations.js';
+
+function Master({ title, headers, items, cells, onAdd, onRemove }) {
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex items-center justify-between p-4">
+        <h3 className="font-bold">{title}</h3>
+        <button
+          onClick={onAdd}
+          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white shadow hover:bg-indigo-700"
+        >
+          ＋ 追加
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[650px] text-sm">
+          <thead className="bg-slate-50 text-left text-slate-500">
+            <tr>
+              {headers.map((x) => (
+                <th key={x} className="px-4 py-2">
+                  {x}
+                </th>
+              ))}
+              <th />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {items.map((item) => (
+              <tr key={item.id}>
+                {cells(item).map((cell, i) => (
+                  <td key={i} className="px-4 py-2">
+                    {cell}
+                  </td>
+                ))}
+                <td className="px-4 text-right">
+                  <button
+                    onClick={() => {
+                      if (confirm("この項目をマスタから削除しますか？"))
+                        onRemove(item.id);
+                    }}
+                    className="text-rose-600 hover:underline font-bold"
+                  >
+                    削除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+export function Settings({ data, setData, openConfigModal }) {
+  const ref = useRef(null);
+
+  const edit = (key, id, field, value) => {
+    const isString = ["name", "account", "recovery"].includes(field);
+    setData((d) => {
+      if (key === "accounts" && field === "name") {
+        const oldAcc = d.accounts.find((x) => x.id === id);
+        const oldName = oldAcc?.name;
+        return {
+          ...d,
+          accounts: d.accounts.map((x) =>
+            x.id === id ? { ...x, name: value } : x
+          ),
+          bills: oldName
+            ? d.bills.map((b) =>
+                b.account === oldName ? { ...b, account: value } : b
+              )
+            : d.bills,
+        };
+      }
+      return {
+        ...d,
+        [key]: d[key].map((x) =>
+          x.id === id ? { ...x, [field]: isString ? value : n(value) } : x
+        ),
+      };
+    });
+  };
+
+  const add = (key, value) =>
+    setData((d) => ({
+      ...d,
+      [key]: [...d[key], { ...value, id: generateId(key) }],
+    }));
+  const remove = (key, id) =>
+    setData((d) => ({
+      ...d,
+      [key]: d[key].filter((x) => x.id !== id),
+    }));
+
+  const exportJSON = () => {
+    const updatedData = {
+      ...data,
+      settings: { ...data.settings, lastBackupDate: new Date().toISOString() },
+    };
+    setData(updatedData);
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          { app: "くらし家計帳", version: 8, data: updatedData },
+          null,
+          2
+        ),
+      ],
+      { type: "application/json" }
+    );
+    const url = URL.createObjectURL(blob),
+      a = document.createElement("a");
+    a.href = url;
+    a.download = `kakei-backup-${nowYM()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCSV = () => {
+    let csv = "\uFEFF年月,区分,項目名,金額/評価額,メモ/詳細\n";
+    Object.entries(data.monthly)
+      .sort()
+      .forEach(([ym, m]) => {
+        (m.incomeItems || []).forEach((i) => {
+          csv += `${escapeCSV(ym)},${escapeCSV("収入")},${escapeCSV(i.name)},${i.amount},""\n`;
+        });
+        billsFor(data, m).forEach((b) => {
+          csv += `${escapeCSV(ym)},${escapeCSV("固定費")},${escapeCSV(b.name)},${b.amount},${escapeCSV(`口座:${b.account}`)}\n`;
+        });
+        (m.tempExpenses || []).forEach((t) => {
+          csv += `${escapeCSV(ym)},${escapeCSV("臨時出費")},${escapeCSV(t.name)},${t.amount},""\n`;
+        });
+        (m.securities || []).forEach((s) => {
+          csv += `${escapeCSV(ym)},${escapeCSV("証券")},${escapeCSV(s.name)},${s.value},${escapeCSV(`損益:${s.profit}`)}\n`;
+        });
+      });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob),
+      a = document.createElement("a");
+    a.href = url;
+    a.download = `kakei-export-${nowYM()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const importJSON = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (x) => {
+      try {
+        const parsed = JSON.parse(x.target.result),
+          value = parsed.data || parsed;
+        if (!value || typeof value !== "object") throw Error();
+        if (confirm("現在のデータを復元内容で置き換えます。よろしいですか？")) {
+          setData(normalize(value));
+          alert("データを復元しました。");
+        }
+      } catch {
+        alert("JSONファイルを読み込めませんでした。");
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold">設定・マスタ管理</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          マスタデータ、起算日、エクスポートを管理します。
+        </p>
+      </div>
+
+      <Card>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold flex items-center gap-2">
+              <span>Firebase クラウド同期</span>
+              <span
+                className={`inline-block h-2.5 w-2.5 rounded-full ${
+                  typeof window !== "undefined" && window.firebaseDb
+                    ? "bg-emerald-500"
+                    : "bg-amber-500"
+                }`}
+              ></span>
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {typeof window !== "undefined" && window.firebaseDb
+                ? "クラウド（Firestore）に接続されています。"
+                : "Firebase設定が未設定または初期化エラーです。"}
+            </p>
+          </div>
+          <button
+            onClick={openConfigModal}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-50 shadow-sm"
+          >
+            設定を変更
+          </button>
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="font-bold">バックアップ・データ出力</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          定期的なバックアップを推奨します（CSV出力はExcel等で閲覧可能）。
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={exportJSON}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-indigo-700"
+          >
+            JSONバックアップを保存
+          </button>
+          <button
+            onClick={exportCSV}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700"
+          >
+            CSVエクスポート
+          </button>
+          <button
+            onClick={() => ref.current?.click()}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold hover:bg-slate-50"
+          >
+            JSON復元
+          </button>
+          <input
+            ref={ref}
+            type="file"
+            accept=".json,application/json"
+            onChange={importJSON}
+            className="hidden"
+          />
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="font-bold">起算日設定</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium">
+            精算の起算日
+            <div className="mt-1">
+              <Money
+                small
+                value={data.settings.settlementStart}
+                onChange={(v) =>
+                  setData((d) => ({
+                    ...d,
+                    settings: { ...d.settings, settlementStart: p(v) },
+                  }))
+                }
+              />
+              <span className="ml-2 text-xs">日</span>
+            </div>
+          </label>
+          <label className="text-sm font-medium">
+            資金繰りの起算日
+            <div className="mt-1">
+              <Money
+                small
+                value={data.settings.cashStart}
+                onChange={(v) =>
+                  setData((d) => ({
+                    ...d,
+                    settings: { ...d.settings, cashStart: p(v) },
+                  }))
+                }
+              />
+              <span className="ml-2 text-xs">日</span>
+            </div>
+          </label>
+        </div>
+      </Card>
+
+      <Master
+        title="カテゴリマスタ・回収設定"
+        headers={["名称", "予算", "回収方法", "固定回収額"]}
+        items={data.categories}
+        cells={(c) => [
+          <Text
+            key="name"
+            value={c.name}
+            onChange={(v) => edit("categories", c.id, "name", v)}
+          />,
+          <Money
+            key="budget"
+            small
+            value={c.budget}
+            onChange={(v) => edit("categories", c.id, "budget", v)}
+          />,
+          <select
+            key="recovery"
+            value={c.recovery}
+            onChange={(e) => edit("categories", c.id, "recovery", e.target.value)}
+            className="rounded border border-slate-300 px-2 py-1.5"
+          >
+            <option value="half">折半（50%）</option>
+            <option value="full">全額（100%）</option>
+            <option value="fixed">固定額回収</option>
+          </select>,
+          <Money
+            key="recoveryAmount"
+            small
+            value={c.recoveryAmount}
+            onChange={(v) => edit("categories", c.id, "recoveryAmount", v)}
+          />,
+        ]}
+        onAdd={() =>
+          add("categories", {
+            name: "新しいカテゴリ",
+            budget: 0,
+            recovery: "half",
+            recoveryAmount: 0,
+          })
+        }
+        onRemove={(id) => remove("categories", id)}
+      />
+
+      <Master
+        title="固定費マスタ"
+        headers={["名称", "標準予算", "支払日", "引落口座"]}
+        items={data.bills}
+        cells={(b) => [
+          <Text
+            key="name"
+            value={b.name}
+            onChange={(v) => edit("bills", b.id, "name", v)}
+          />,
+          <Money
+            key="budget"
+            small
+            value={b.budget}
+            onChange={(v) => edit("bills", b.id, "budget", v)}
+          />,
+          <Money
+            key="day"
+            small
+            value={b.day}
+            onChange={(v) => edit("bills", b.id, "day", v)}
+          />,
+          <select
+            key="account"
+            value={b.account}
+            onChange={(e) => edit("bills", b.id, "account", e.target.value)}
+            className="rounded border border-slate-300 px-2 py-1.5 text-sm bg-white outline-none focus:border-indigo-500"
+          >
+            {data.accounts.map((a) => (
+              <option key={a.id} value={a.name}>
+                {a.name}
+              </option>
+            ))}
+          </select>,
+        ]}
+        onAdd={() =>
+          add("bills", {
+            name: "新しい支出",
+            budget: 0,
+            day: 15,
+            account: data.accounts[0]?.name || "",
+          })
+        }
+        onRemove={(id) => remove("bills", id)}
+      />
+
+      <Master
+        title="口座マスタ"
+        headers={["名称", "初期残高"]}
+        items={data.accounts}
+        cells={(a) => [
+          <Text
+            key="name"
+            value={a.name}
+            onChange={(v) => edit("accounts", a.id, "name", v)}
+          />,
+          <Money
+            key="balance"
+            small
+            value={a.balance}
+            onChange={(v) => edit("accounts", a.id, "balance", v)}
+          />,
+        ]}
+        onAdd={() => add("accounts", { name: "新しい口座", balance: 0 })}
+        onRemove={(id) => remove("accounts", id)}
+      />
+
+      <Master
+        title="ポイント・マイルマスタ"
+        headers={["名称", "通常交換倍率", "キャンペーン交換倍率"]}
+        items={data.points}
+        cells={(x) => [
+          <Text
+            key="name"
+            value={x.name}
+            onChange={(v) => edit("points", x.id, "name", v)}
+          />,
+          <Decimal
+            key="regularRate"
+            value={x.regularRate}
+            onChange={(v) => edit("points", x.id, "regularRate", v)}
+          />,
+          <Decimal
+            key="campaignRate"
+            value={x.campaignRate}
+            onChange={(v) => edit("points", x.id, "campaignRate", v)}
+          />,
+        ]}
+        onAdd={() =>
+          add("points", { name: "新しいポイント", regularRate: 1, campaignRate: 1 })
+        }
+        onRemove={(id) => remove("points", id)}
+      />
+    </div>
+  );
+}

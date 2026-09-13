@@ -1,5 +1,8 @@
-﻿# Firebase secret config
+# Firebase secret config
 firebase-config.js
+
+node_modules
+dist
 
 # Local environment / IDE
 .DS_Store
