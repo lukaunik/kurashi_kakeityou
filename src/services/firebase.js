@@ -1,7 +1,10 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, signInAnonymously } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 let db = null;
+let auth = null;
+let currentUser = null;
 
 export function getStoredFirebaseConfig() {
   if (
@@ -24,27 +27,42 @@ export function getStoredFirebaseConfig() {
   return null;
 }
 
-export function initFirebase(config) {
+export async function initFirebase(config) {
   try {
-    const app = initializeApp(config);
+    const app = getApps().length === 0 ? initializeApp(config) : getApp();
     db = getFirestore(app);
+    auth = getAuth(app);
+
+    let user = auth.currentUser;
+    if (!user) {
+      const userCred = await signInAnonymously(auth);
+      user = userCred.user;
+    }
+    currentUser = user;
+
     if (typeof window !== "undefined") {
       window.firebaseDb = db;
+      window.firebaseAuth = auth;
+      window.firebaseUser = user;
       window.firebaseDoc = doc;
       window.firebaseGetDoc = getDoc;
       window.firebaseSetDoc = setDoc;
       window.currentFirebaseConfig = config;
       window.firebaseNeedsConfig = false;
     }
-    return db;
+    return { db, auth, user };
   } catch (err) {
-    console.error("Firebase初期化エラー:", err);
+    console.error("Firebase初期化/認証エラー:", err);
     return null;
   }
 }
 
 export function getFirebaseDb() {
   return db || (typeof window !== "undefined" ? window.firebaseDb : null);
+}
+
+export function getCurrentUser() {
+  return currentUser || (typeof window !== "undefined" ? window.firebaseUser : null);
 }
 
 export { doc, getDoc, setDoc };

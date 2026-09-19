@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   nowYM,
   blank,
@@ -26,10 +26,10 @@ export function App() {
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const isInitialLoaded = useRef(false);
 
-  const handleSaveFirebaseConfig = (cfg) => {
+  const handleSaveFirebaseConfig = async (cfg) => {
     try {
       localStorage.setItem("kakeibo_firebase_config", JSON.stringify(cfg));
-      initFirebase(cfg);
+      await initFirebase(cfg);
       setConfigModalOpen(false);
       window.location.reload();
     } catch (e) {
@@ -37,7 +37,7 @@ export function App() {
     }
   };
 
-  // 初回Firestoreデータ取得
+  // 初回Firestoreデータ取得（UIDベースマルチユーザー対応）
   useEffect(() => {
     let isMounted = true;
     const fetchInitialData = async () => {
@@ -51,9 +51,9 @@ export function App() {
           return;
         }
 
-        const db = initFirebase(config);
-        if (!db) {
-          console.error("Firebaseの初期化失敗");
+        const res = await initFirebase(config);
+        if (!res || !res.db || !res.user) {
+          console.error("Firebase初期化/認証失敗");
           if (isMounted) {
             setIsLoading(false);
             setConfigModalOpen(true);
@@ -61,7 +61,8 @@ export function App() {
           return;
         }
 
-        const docRef = doc(db, "kakeibo_data", "main_doc");
+        const { db, user } = res;
+        const docRef = doc(db, "users", user.uid, "kakeibo_data", "main");
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
@@ -71,7 +72,18 @@ export function App() {
             isInitialLoaded.current = true;
           }
         } else {
-          const initialData = normalize(null);
+          // 旧共有ドキュメント（kakeibo_data/main_doc）からのマイグレーションチェック
+          let initialData = normalize(null);
+          try {
+            const legacyRef = doc(db, "kakeibo_data", "main_doc");
+            const legacySnap = await getDoc(legacyRef);
+            if (legacySnap.exists()) {
+              initialData = normalize(legacySnap.data());
+            }
+          } catch (e) {
+            console.log("旧データチェックをスキップ:", e);
+          }
+
           await setDoc(docRef, initialData);
           if (isMounted) {
             setData(initialData);
@@ -93,14 +105,16 @@ export function App() {
     };
   }, []);
 
-  // データ更新時のFirestore非同期保存（デバウンス: 1000ms）
+  // データ更新時のFirestore非同期保存（デバウンス: 1000ms、UIDベースパス）
   useEffect(() => {
     if (!isInitialLoaded.current) return;
-    if (!window.firebaseDb) return;
+    const currentDb = window.firebaseDb;
+    const currentUser = window.firebaseUser;
+    if (!currentDb || !currentUser) return;
 
     const timer = setTimeout(async () => {
       try {
-        const docRef = doc(window.firebaseDb, "kakeibo_data", "main_doc");
+        const docRef = doc(currentDb, "users", currentUser.uid, "kakeibo_data", "main");
         await setDoc(docRef, data);
       } catch (err) {
         console.error("Firestoreへの保存に失敗しました:", err);
