@@ -12,12 +12,15 @@ import {
 export function Analytics({ data, ym, setYm }) {
   const [mode, setMode] = useState("month");
   const [year, setYear] = useState(ym.slice(0, 4));
-  const years = Array.from(
-    new Set([
-      new Date().getFullYear().toString(),
-      ...Object.keys(data.monthly).map((x) => x.slice(0, 4)),
-    ])
-  ).sort((a, b) => Number(b) - Number(a));
+
+  const years = useMemo(() => {
+    return Array.from(
+      new Set([
+        new Date().getFullYear().toString(),
+        ...Object.keys(data.monthly).map((x) => x.slice(0, 4)),
+      ])
+    ).sort((a, b) => Number(b) - Number(a));
+  }, [data.monthly]);
 
   const keys = useMemo(() => {
     const saved = Object.keys(data.monthly).sort();
@@ -30,153 +33,175 @@ export function Analytics({ data, ym, setYm }) {
     return saved.length ? saved : [ym];
   }, [mode, year, ym, data.monthly]);
 
-  const rows = keys.map((key) => stats(data, key));
+  const rows = useMemo(
+    () => keys.map((key) => stats(data, key)),
+    [keys, data]
+  );
 
-  // データが存在する月数の正確なカウント（12ヶ月固定ではなく入力データがある月のみで割る）
+  // データが存在する月数の正確なカウント
   const activeMonthCount = useMemo(() => {
     if (mode === "month") return 1;
     const activeKeys = keys.filter((k) => Boolean(data.monthly[k]));
     return activeKeys.length || 1;
   }, [mode, keys, data.monthly]);
 
-  // 前月・前年比較データの計算準備
-  const prevKey = prevYM(ym);
-  const prevStats = stats(data, prevKey);
+  // 前月・前年比較データの計算準備（useMemoで最適化）
+  const comparisonData = useMemo(() => {
+    const prevKey = prevYM(ym);
+    const prevStats = stats(data, prevKey);
 
-  const prevYearKey = `${Number(ym.slice(0, 4)) - 1}-${ym.slice(5)}`;
-  const prevYearStats = stats(data, prevYearKey);
+    const prevYearKey = `${Number(ym.slice(0, 4)) - 1}-${ym.slice(5)}`;
+    const prevYearStats = stats(data, prevYearKey);
 
-  const prevYearNum = String(Number(year) - 1);
-  const prevYearKeys = Array.from(
-    { length: 12 },
-    (_, i) => `${prevYearNum}-${String(i + 1).padStart(2, "0")}`
-  );
-  const prevYearRows = prevYearKeys.map((k) => stats(data, k));
+    const prevYearNum = String(Number(year) - 1);
+    const prevYearKeys = Array.from(
+      { length: 12 },
+      (_, i) => `${prevYearNum}-${String(i + 1).padStart(2, "0")}`
+    );
+    const prevYearRows = prevYearKeys.map((k) => stats(data, k));
 
-  // 集計: 資金管理側支出(spending)のみ使用し、精算(life)は除外
-  const total = rows.reduce(
-    (o, r) => ({
-      life: o.life + r.life,
-      due: o.due + r.due,
-      recovered: o.recovered + r.recovered,
-      fixed: o.fixed + r.fixed,
-      temp: o.temp + r.temp,
-      spending: o.spending + r.spending,
-      income: o.income + r.income,
-    }),
-    {
-      life: 0,
-      due: 0,
-      recovered: 0,
-      fixed: 0,
-      temp: 0,
-      spending: 0,
-      income: 0,
-    }
-  );
+    return { prevKey, prevStats, prevYearStats, prevYearRows };
+  }, [ym, year, data]);
 
-  // 精算分析用平均値（データが存在する月数で算出）
+  // 集計: 資金管理側支出(spending)のみ使用
+  const total = useMemo(() => {
+    return rows.reduce(
+      (o, r) => ({
+        life: o.life + r.life,
+        due: o.due + r.due,
+        recovered: o.recovered + r.recovered,
+        fixed: o.fixed + r.fixed,
+        temp: o.temp + r.temp,
+        spending: o.spending + r.spending,
+        income: o.income + r.income,
+      }),
+      {
+        life: 0,
+        due: 0,
+        recovered: 0,
+        fixed: 0,
+        temp: 0,
+        spending: 0,
+        income: 0,
+      }
+    );
+  }, [rows]);
+
+  // 精算分析用平均値
   const avgLife = total.life / activeMonthCount;
   const avgDue = total.due / activeMonthCount;
   const avgRecovered = total.recovered / activeMonthCount;
 
-  const categoryRows = data.categories.map((c) => {
-    const amount = rows.reduce((s, r) => s + p(r.ex[c.id]), 0);
-    const average = amount / activeMonthCount;
+  // カテゴリ別精算実績（useMemoで計算最適化）
+  const categoryRows = useMemo(() => {
+    const { prevStats, prevYearStats, prevYearRows } = comparisonData;
+    return data.categories.map((c) => {
+      const amount = rows.reduce((s, r) => s + p(r.ex[c.id]), 0);
+      const average = amount / activeMonthCount;
 
-    const prevAmount = mode === "month" ? p(prevStats.ex[c.id]) : 0;
-    const diffPrev = amount - prevAmount;
+      const prevAmount = mode === "month" ? p(prevStats.ex[c.id]) : 0;
+      const diffPrev = amount - prevAmount;
 
-    const prevYearAmount =
-      mode === "month"
-        ? p(prevYearStats.ex[c.id])
-        : prevYearRows.reduce((s, r) => s + p(r.ex[c.id]), 0);
-    const diffPrevYear = amount - prevYearAmount;
+      const prevYearAmount =
+        mode === "month"
+          ? p(prevYearStats.ex[c.id])
+          : prevYearRows.reduce((s, r) => s + p(r.ex[c.id]), 0);
+      const diffPrevYear = amount - prevYearAmount;
 
-    return {
-      ...c,
-      amount,
-      average,
-      diffPrev,
-      diffPrevYear,
-    };
-  });
+      return {
+        ...c,
+        amount,
+        average,
+        diffPrev,
+        diffPrevYear,
+      };
+    });
+  }, [data.categories, rows, activeMonthCount, mode, comparisonData]);
 
-  // 固定費・定期引き落としの項目別詳細分析
-  const billRows = data.bills.map((b) => {
-    const totalAmount = rows.reduce(
-      (sum, r) =>
-        sum +
-        (Object.prototype.hasOwnProperty.call(r.m.billAmounts || {}, b.id)
-          ? p(r.m.billAmounts[b.id])
-          : 0),
-      0
-    );
-    const average = totalAmount / activeMonthCount;
-    const targetBudget = p(b.budget) * (mode === "month" ? 1 : activeMonthCount);
-    const rate = targetBudget > 0 ? (totalAmount / targetBudget) * 100 : 0;
+  // 固定費・定期引き落としの項目別詳細分析（useMemoで計算最適化）
+  const billRows = useMemo(() => {
+    const { prevStats, prevYearStats, prevYearRows } = comparisonData;
+    return data.bills.map((b) => {
+      const totalAmount = rows.reduce(
+        (sum, r) =>
+          sum +
+          (Object.prototype.hasOwnProperty.call(r.m.billAmounts || {}, b.id)
+            ? p(r.m.billAmounts[b.id])
+            : 0),
+        0
+      );
+      const average = totalAmount / activeMonthCount;
+      const targetBudget = p(b.budget) * (mode === "month" ? 1 : activeMonthCount);
+      const rate = targetBudget > 0 ? (totalAmount / targetBudget) * 100 : 0;
 
-    const prevAmount =
-      mode === "month" ? p(prevStats.m.billAmounts?.[b.id]) : 0;
-    const diffPrev = totalAmount - prevAmount;
+      const prevAmount =
+        mode === "month" ? p(prevStats.m.billAmounts?.[b.id]) : 0;
+      const diffPrev = totalAmount - prevAmount;
 
-    const prevYearAmount =
-      mode === "month"
-        ? p(prevYearStats.m.billAmounts?.[b.id])
-        : prevYearRows.reduce(
-            (sum, r) => sum + p(r.m.billAmounts?.[b.id]),
-            0
-          );
-    const diffPrevYear = totalAmount - prevYearAmount;
+      const prevYearAmount =
+        mode === "month"
+          ? p(prevYearStats.m.billAmounts?.[b.id])
+          : prevYearRows.reduce(
+              (sum, r) => sum + p(r.m.billAmounts?.[b.id]),
+              0
+            );
+      const diffPrevYear = totalAmount - prevYearAmount;
 
-    return {
-      ...b,
-      totalAmount,
-      average,
-      targetBudget,
-      rate,
-      diffPrev,
-      diffPrevYear,
-    };
-  });
+      return {
+        ...b,
+        totalAmount,
+        average,
+        targetBudget,
+        rate,
+        diffPrev,
+        diffPrevYear,
+      };
+    });
+  }, [data.bills, rows, activeMonthCount, mode, comparisonData]);
 
-  const latestKey = Object.keys(data.monthly).sort().at(-1) || ym;
-  const latest = stats(data, latestKey);
+  const latestKey = useMemo(() => {
+    return Object.keys(data.monthly).sort().at(-1) || ym;
+  }, [data.monthly, ym]);
 
-  const unpaidMonths = rows
-    .filter((r) => r.due > 0 && !r.isPaid)
-    .map((r) => r.key);
+  const latest = useMemo(() => stats(data, latestKey), [data, latestKey]);
+
+  const unpaidMonths = useMemo(() => {
+    return rows.filter((r) => r.due > 0 && !r.isPaid).map((r) => r.key);
+  }, [rows]);
+
   const net = total.income - total.spending;
   const cash = latest.assets.cash;
   const securities = latest.assets.securities;
   const assetTotal = cash + securities;
 
-  const currentStats = stats(data, ym);
+  const currentStats = useMemo(() => stats(data, ym), [data, ym]);
 
-  const incomeChart = rows.map((r) => ({ label: r.key, value: r.income }));
-  const spendingChart = rows.map((r) => ({ label: r.key, value: r.spending }));
-  const netChart = rows.map((r) => ({ label: r.key, value: r.net }));
-  const assetChart = rows.map((r) => ({ label: r.key, value: r.assets.total }));
+  const incomeChart = useMemo(() => rows.map((r) => ({ label: r.key, value: r.income })), [rows]);
+  const spendingChart = useMemo(() => rows.map((r) => ({ label: r.key, value: r.spending })), [rows]);
+  const netChart = useMemo(() => rows.map((r) => ({ label: r.key, value: r.net })), [rows]);
+  const assetChart = useMemo(() => rows.map((r) => ({ label: r.key, value: r.assets.total })), [rows]);
 
   // 総資産ポートフォリオの銘柄別表示
-  const securitiesItems = (latest.m.securities || []).filter(
-    (s) => p(s.value) > 0
-  );
-  const assetPortfolio = [
-    { name: "現金残高", amount: cash },
-    ...(securitiesItems.length > 0
-      ? securitiesItems.map((s, idx) => ({
-          id: s.id || `sec-${idx}`,
-          name: s.name || "銘柄未設定",
-          amount: p(s.value),
-        }))
-      : [{ name: "証券投資評価額", amount: securities }]),
-  ];
+  const assetPortfolio = useMemo(() => {
+    const securitiesItems = (latest.m.securities || []).filter(
+      (s) => p(s.value) > 0
+    );
+    return [
+      { name: "現金残高", amount: cash },
+      ...(securitiesItems.length > 0
+        ? securitiesItems.map((s, idx) => ({
+            id: s.id || `sec-${idx}`,
+            name: s.name || "銘柄未設定",
+            amount: p(s.value),
+          }))
+        : [{ name: "証券投資評価額", amount: securities }]),
+    ];
+  }, [latest.m.securities, cash, securities]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">分析ダッシュボード</h2>
+        <h2 className="text-2xl font-bold text-slate-800">分析ダッシュボード</h2>
         <p className="mt-1 text-sm text-slate-500">
           精算・資金繰り・資産状態を統合可視化します。
         </p>
@@ -193,10 +218,10 @@ export function Analytics({ data, ym, setYm }) {
               <button
                 key={v}
                 onClick={() => setMode(v)}
-                className={`rounded-md px-3 py-2 text-sm font-bold ${
+                className={`rounded-md px-3 py-2 text-sm font-bold transition-all ${
                   mode === v
                     ? "bg-white text-indigo-700 shadow-sm"
-                    : "text-slate-500"
+                    : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 {label}
@@ -205,12 +230,12 @@ export function Analytics({ data, ym, setYm }) {
           </div>
           {mode === "month" && <MonthPick ym={ym} setYm={setYm} />}
           {mode === "year" && (
-            <label className="text-sm font-medium">
-              対象年
+            <label className="text-sm font-medium flex items-center gap-2">
+              <span className="text-slate-600">対象年</span>
               <select
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
-                className="ml-2 rounded-lg border border-slate-300 px-3 py-2"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold bg-white outline-none focus:border-indigo-500"
               >
                 {years.map((y) => (
                   <option key={y}>{y}</option>
@@ -222,8 +247,10 @@ export function Analytics({ data, ym, setYm }) {
       </Card>
 
       {/* 精算セクション */}
-      <section className="space-y-3">
-        <h3 className="font-bold text-indigo-800">精算分析</h3>
+      <section className="space-y-4">
+        <h3 className="text-lg font-bold text-indigo-800 flex items-center gap-2">
+          <span>📊</span> 精算分析
+        </h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Stat
             label={
@@ -240,7 +267,7 @@ export function Analytics({ data, ym, setYm }) {
                 : `回収対象額 (月平均: ${yen(avgDue)})`
             }
             value={yen(total.due)}
-            tone="bg-indigo-600 text-white"
+            tone="bg-indigo-600 text-white shadow-md"
           />
           <Stat
             label={
@@ -249,20 +276,20 @@ export function Analytics({ data, ym, setYm }) {
                 : `実回収額 (月平均: ${yen(avgRecovered)})`
             }
             value={yen(total.recovered)}
-            tone="bg-emerald-600 text-white"
+            tone="bg-emerald-600 text-white shadow-md"
           />
         </div>
 
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold">未回収状態の月</h3>
-              <p className="mt-1 text-sm text-slate-500">
+              <h3 className="font-bold text-slate-800">未回収状態の月</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
                 対象期間内の回収完了フラグが立っていない月の一覧です。
               </p>
             </div>
             <span
-              className={`rounded-full px-3 py-1 text-sm font-bold ${
+              className={`rounded-full px-3 py-1 text-xs font-bold ${
                 unpaidMonths.length === 0
                   ? "bg-emerald-100 text-emerald-700"
                   : "bg-amber-100 text-amber-700"
@@ -274,28 +301,35 @@ export function Analytics({ data, ym, setYm }) {
             </span>
           </div>
           {unpaidMonths.length > 0 && (
-            <p className="mt-3 font-semibold text-rose-600 text-sm">
+            <p className="mt-3 font-semibold text-rose-600 text-sm bg-rose-50 p-2 rounded-lg border border-rose-100">
               未回収月: {unpaidMonths.join("、")}
             </p>
           )}
         </Card>
 
-        <div className="grid gap-4 lg:grid-cols-2 min-w-0">
+        <div className="grid gap-5 lg:grid-cols-2 min-w-0">
           <Card className="overflow-hidden p-0">
-            <div className="p-4">
-              <h3 className="font-bold">カテゴリ別精算実績</h3>
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+              <h3 className="font-bold text-slate-800">カテゴリ別精算実績</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {mode === "month"
+                  ? "当月のカテゴリ別予算と実績の比較です。"
+                  : "選択期間におけるカテゴリごとの予算、合計、平均、達成率です。"}
+              </p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[500px] text-sm">
-                <thead className="bg-slate-50 text-left text-slate-500">
+
+            {/* PC用テーブル（高視認性デザイン: 右寄せ + font-mono + tabular-nums + 余白拡張 + ゼブラパターン） */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead className="bg-slate-100/80 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3">カテゴリ</th>
-                    <th>予算</th>
-                    <th>実績合計</th>
-                    {mode !== "month" && <th>月平均</th>}
-                    <th>前月差</th>
-                    <th>前年差</th>
-                    <th className="px-4">予算達成率</th>
+                    <th className="px-4 py-3 text-left">カテゴリ</th>
+                    <th className="px-4 py-3 text-right">予算</th>
+                    <th className="px-4 py-3 text-right">実績合計</th>
+                    {mode !== "month" && <th className="px-4 py-3 text-right">月平均</th>}
+                    <th className="px-4 py-3 text-right">前月差</th>
+                    <th className="px-4 py-3 text-right">前年差</th>
+                    <th className="px-4 py-3 text-right">達成率</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -303,39 +337,47 @@ export function Analytics({ data, ym, setYm }) {
                     const targetBudget = p(c.budget) * (mode === "month" ? 1 : activeMonthCount);
                     const rate = targetBudget > 0 ? (c.amount / targetBudget) * 100 : 0;
                     return (
-                      <tr key={c.id}>
-                        <td className="px-4 py-3 font-medium">{c.name}</td>
-                        <td>{yen(c.budget)}</td>
-                        <td className="font-semibold">{yen(c.amount)}</td>
-                        {mode !== "month" && <td>{yen(c.average)}</td>}
-                        <td className="text-xs">
+                      <tr key={c.id} className="even:bg-slate-50/60 hover:bg-indigo-50/30 transition-colors">
+                        <td className="px-4 py-3.5 font-bold text-slate-800">{c.name}</td>
+                        <td className="px-4 py-3.5 text-right font-mono tabular-nums text-slate-600">{yen(c.budget)}</td>
+                        <td className="px-4 py-3.5 text-right font-mono tabular-nums font-semibold text-slate-900">{yen(c.amount)}</td>
+                        {mode !== "month" && (
+                          <td className="px-4 py-3.5 text-right font-mono tabular-nums text-slate-600">{yen(c.average)}</td>
+                        )}
+                        <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
                           <span
-                            className={
+                            className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
                               c.diffPrev <= 0
-                                ? "text-emerald-600 font-semibold"
-                                : "text-rose-600 font-semibold"
-                            }
+                                ? "text-emerald-700 bg-emerald-50"
+                                : "text-rose-700 bg-rose-50"
+                            }`}
                           >
                             {signedYen(c.diffPrev)}
                           </span>
                         </td>
-                        <td className="text-xs">
+                        <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
                           <span
-                            className={
+                            className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
                               c.diffPrevYear <= 0
-                                ? "text-emerald-600 font-semibold"
-                                : "text-rose-600 font-semibold"
-                            }
+                                ? "text-emerald-700 bg-emerald-50"
+                                : "text-rose-700 bg-rose-50"
+                            }`}
                           >
                             {signedYen(c.diffPrevYear)}
                           </span>
                         </td>
-                        <td
-                          className={`px-4 font-bold ${
-                            rate > 100 ? "text-rose-600" : "text-emerald-600"
-                          }`}
-                        >
-                          {rate.toFixed(0)}%
+                        <td className="px-4 py-3.5 text-right font-mono tabular-nums font-bold">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-xs ${
+                              rate > 100
+                                ? "bg-rose-100 text-rose-700"
+                                : rate === 0
+                                ? "bg-slate-100 text-slate-500"
+                                : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {rate.toFixed(0)}%
+                          </span>
                         </td>
                       </tr>
                     );
@@ -343,17 +385,79 @@ export function Analytics({ data, ym, setYm }) {
                 </tbody>
               </table>
             </div>
+
+            {/* スマホ用カード表示（視認性抜群・重なりゼロ） */}
+            <div className="sm:hidden divide-y divide-slate-100">
+              {categoryRows.map((c) => {
+                const targetBudget = p(c.budget) * (mode === "month" ? 1 : activeMonthCount);
+                const rate = targetBudget > 0 ? (c.amount / targetBudget) * 100 : 0;
+                return (
+                  <div key={c.id} className="p-4 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 text-base">{c.name}</span>
+                      <span
+                        className={`rounded px-2.5 py-0.5 text-xs font-bold font-mono tabular-nums ${
+                          rate > 100
+                            ? "bg-rose-100 text-rose-700"
+                            : rate === 0
+                            ? "bg-slate-100 text-slate-500"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        達成率 {rate.toFixed(0)}%
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block text-[10px]">設定予算</span>
+                        <strong className="text-slate-700 text-xs">{yen(c.budget)}</strong>
+                      </div>
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block text-[10px]">
+                          {mode === "month" ? "今月実績" : "実績合計"}
+                        </span>
+                        <strong className="text-slate-900 text-xs font-bold">{yen(c.amount)}</strong>
+                      </div>
+
+                      {mode !== "month" && (
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="text-slate-400 block text-[10px]">月平均</span>
+                          <strong className="text-slate-700 text-xs">{yen(c.average)}</strong>
+                        </div>
+                      )}
+
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block text-[10px]">前月差</span>
+                        <strong className={c.diffPrev <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"}>
+                          {signedYen(c.diffPrev)}
+                        </strong>
+                      </div>
+
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block text-[10px]">前年差</span>
+                        <strong className={c.diffPrevYear <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"}>
+                          {signedYen(c.diffPrevYear)}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </Card>
           <Card>
-            <h3 className="font-bold">カテゴリ別生活費割合</h3>
+            <h3 className="font-bold text-slate-800">カテゴリ別生活費割合</h3>
             <Donut rows={categoryRows} />
           </Card>
         </div>
       </section>
 
       {/* 資金繰り・資産セクション */}
-      <section className="space-y-3">
-        <h3 className="font-bold text-emerald-800">資金繰り・資産分析</h3>
+      <section className="space-y-4 pt-2">
+        <h3 className="text-lg font-bold text-emerald-800 flex items-center gap-2">
+          <span>💰</span> 資金繰り・資産分析
+        </h3>
         <p className="text-xs text-slate-500">
           ※ 支出合計から精算生活費（生活費の精算）は除外されています。
         </p>
@@ -362,60 +466,60 @@ export function Analytics({ data, ym, setYm }) {
           <Stat
             label="総収入"
             value={yen(total.income)}
-            tone="bg-emerald-600 text-white"
+            tone="bg-emerald-600 text-white shadow-md"
           />
           <Stat label="支出合計（固定+臨時）" value={yen(total.spending)} />
           <Stat
             label="純貯蓄額（収入-支出）"
             value={signedYen(net)}
-            tone={net < 0 ? "bg-rose-600 text-white" : "bg-slate-900 text-white"}
+            tone={net < 0 ? "bg-rose-600 text-white shadow-md" : "bg-slate-900 text-white shadow-md"}
           />
           <Stat
             label="最新総資産（現金+証券）"
             value={yen(assetTotal)}
-            tone="bg-indigo-600 text-white"
+            tone="bg-indigo-600 text-white shadow-md"
           />
         </div>
 
         {/* 前月比（当月表示時のみ） */}
         {mode === "month" && (
           <Card>
-            <h3 className="font-bold mb-2">前月（{prevKey}）との比較</h3>
+            <h3 className="font-bold text-slate-800 mb-2">前月（{comparisonData.prevKey}）との比較</h3>
             <div className="grid gap-3 sm:grid-cols-3 text-sm">
-              <div>
-                <p className="text-slate-500">収入変化</p>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p className="text-slate-500 text-xs">収入変化</p>
                 <strong
-                  className={
-                    currentStats.income >= prevStats.income
+                  className={`text-base font-mono tabular-nums ${
+                    currentStats.income >= comparisonData.prevStats.income
                       ? "text-emerald-600"
                       : "text-rose-600"
-                  }
+                  }`}
                 >
-                  {signedYen(currentStats.income - prevStats.income)}
+                  {signedYen(currentStats.income - comparisonData.prevStats.income)}
                 </strong>
               </div>
-              <div>
-                <p className="text-slate-500">支出変化</p>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p className="text-slate-500 text-xs">支出変化</p>
                 <strong
-                  className={
-                    currentStats.spending <= prevStats.spending
+                  className={`text-base font-mono tabular-nums ${
+                    currentStats.spending <= comparisonData.prevStats.spending
                       ? "text-emerald-600"
                       : "text-rose-600"
-                  }
+                  }`}
                 >
-                  {signedYen(currentStats.spending - prevStats.spending)}
+                  {signedYen(currentStats.spending - comparisonData.prevStats.spending)}
                 </strong>
               </div>
-              <div>
-                <p className="text-slate-500">純貯蓄変化</p>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p className="text-slate-500 text-xs">純貯蓄変化</p>
                 <strong
-                  className={
-                    currentStats.net >= prevStats.net
+                  className={`text-base font-mono tabular-nums ${
+                    currentStats.net >= comparisonData.prevStats.net
                       ? "text-emerald-600"
                       : "text-rose-600"
-                  }
+                  }`}
                 >
-                  {signedYen(currentStats.net - prevStats.net)}
+                  {signedYen(currentStats.net - comparisonData.prevStats.net)}
                 </strong>
               </div>
             </div>
@@ -424,9 +528,9 @@ export function Analytics({ data, ym, setYm }) {
 
         {/* 固定費・定期引き落としの詳細分析 */}
         <Card className="overflow-hidden p-0">
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="font-bold">固定費・定期引き落とし 詳細分析</h3>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+            <h3 className="font-bold text-slate-800">固定費・定期引き落とし 詳細分析</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
               {mode === "month"
                 ? "当月の固定費・定期引き落としの予定/実績と予算達成状況です。"
                 : "選択期間における項目ごとの設定予算、実績累計、月平均、達成率です。"}
@@ -434,57 +538,57 @@ export function Analytics({ data, ym, setYm }) {
           </div>
           {/* PC用テーブル表示 */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full min-w-[700px] text-sm">
-              <thead className="bg-slate-50 text-left text-slate-500">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-slate-100/80 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3">項目名</th>
-                  <th>引落口座</th>
-                  <th>設定予算 (月額)</th>
-                  <th>{mode === "month" ? "今月実績額" : "実績合計"}</th>
-                  {mode !== "month" && <th>月平均</th>}
-                  <th>前月差</th>
-                  <th>前年差</th>
-                  <th className="px-4 text-right">予算達成率</th>
+                  <th className="px-4 py-3 text-left">項目名</th>
+                  <th className="px-4 py-3 text-left">引落口座</th>
+                  <th className="px-4 py-3 text-right">設定予算 (月額)</th>
+                  <th className="px-4 py-3 text-right">{mode === "month" ? "今月実績額" : "実績合計"}</th>
+                  {mode !== "month" && <th className="px-4 py-3 text-right">月平均</th>}
+                  <th className="px-4 py-3 text-right">前月差</th>
+                  <th className="px-4 py-3 text-right">前年差</th>
+                  <th className="px-4 py-3 text-right">達成率</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {billRows.map((b) => (
-                  <tr key={b.id}>
-                    <td className="px-4 py-3 font-medium">{b.name}</td>
-                    <td className="text-slate-500">{b.account}</td>
-                    <td>{yen(b.budget)}</td>
-                    <td className="font-semibold">{yen(b.totalAmount)}</td>
-                    {mode !== "month" && <td>{yen(b.average)}</td>}
-                    <td className="text-xs">
+                  <tr key={b.id} className="even:bg-slate-50/60 hover:bg-indigo-50/30 transition-colors">
+                    <td className="px-4 py-3.5 font-bold text-slate-800">{b.name}</td>
+                    <td className="px-4 py-3.5 text-slate-500">{b.account}</td>
+                    <td className="px-4 py-3.5 text-right font-mono tabular-nums text-slate-600">{yen(b.budget)}</td>
+                    <td className="px-4 py-3.5 text-right font-mono tabular-nums font-semibold text-slate-900">{yen(b.totalAmount)}</td>
+                    {mode !== "month" && <td className="px-4 py-3.5 text-right font-mono tabular-nums text-slate-600">{yen(b.average)}</td>}
+                    <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
                       <span
-                        className={
+                        className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
                           b.diffPrev <= 0
-                            ? "text-emerald-600 font-semibold"
-                            : "text-rose-600 font-semibold"
-                        }
+                            ? "text-emerald-700 bg-emerald-50"
+                            : "text-rose-700 bg-rose-50"
+                        }`}
                       >
                         {signedYen(b.diffPrev)}
                       </span>
                     </td>
-                    <td className="text-xs">
+                    <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
                       <span
-                        className={
+                        className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
                           b.diffPrevYear <= 0
-                            ? "text-emerald-600 font-semibold"
-                            : "text-rose-600 font-semibold"
-                        }
+                            ? "text-emerald-700 bg-emerald-50"
+                            : "text-rose-700 bg-rose-50"
+                        }`}
                       >
                         {signedYen(b.diffPrevYear)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-bold">
+                    <td className="px-4 py-3.5 text-right font-mono tabular-nums font-bold">
                       <span
-                        className={`rounded px-2 py-0.5 text-xs ${
+                        className={`inline-block px-2 py-0.5 rounded text-xs ${
                           b.rate > 100
                             ? "bg-rose-100 text-rose-700"
                             : b.rate === 0
                             ? "bg-slate-100 text-slate-500"
-                            : "bg-emerald-50 text-emerald-700"
+                            : "bg-emerald-100 text-emerald-700"
                         }`}
                       >
                         {b.rate.toFixed(1)}%
@@ -498,57 +602,57 @@ export function Analytics({ data, ym, setYm }) {
           {/* スマホ用カード表示 */}
           <div className="sm:hidden divide-y divide-slate-100">
             {billRows.map((b) => (
-              <div key={b.id} className="p-4 space-y-2">
+              <div key={b.id} className="p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900">{b.name}</span>
+                  <span className="font-bold text-slate-900 text-base">{b.name}</span>
                   <span
-                    className={`rounded px-2 py-0.5 text-xs font-bold ${
+                    className={`rounded px-2.5 py-0.5 text-xs font-bold font-mono tabular-nums ${
                       b.rate > 100
                         ? "bg-rose-100 text-rose-700"
                         : b.rate === 0
                         ? "bg-slate-100 text-slate-500"
-                        : "bg-emerald-50 text-emerald-700"
+                        : "bg-emerald-100 text-emerald-700"
                     }`}
                   >
                     達成率 {b.rate.toFixed(1)}%
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-                  <div>
-                    <span className="text-slate-400">口座: </span>
-                    {b.account}
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-slate-400 block text-[10px]">口座</span>
+                    <span className="text-slate-700 text-xs font-sans font-medium">{b.account}</span>
                   </div>
-                  <div>
-                    <span className="text-slate-400">月予算: </span>
-                    {yen(b.budget)}
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-slate-400 block text-[10px]">月予算</span>
+                    <strong className="text-slate-700 text-xs">{yen(b.budget)}</strong>
                   </div>
-                  <div>
-                    <span className="text-slate-400">
-                      {mode === "month" ? "今月実績: " : "実績合計: "}
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-slate-400 block text-[10px]">
+                      {mode === "month" ? "今月実績" : "実績合計"}
                     </span>
-                    <strong className="text-slate-900">{yen(b.totalAmount)}</strong>
+                    <strong className="text-slate-900 text-xs font-bold">{yen(b.totalAmount)}</strong>
                   </div>
                   {mode !== "month" && (
-                    <div>
-                      <span className="text-slate-400">月平均: </span>
-                      <strong className="text-slate-900">{yen(b.average)}</strong>
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">月平均</span>
+                      <strong className="text-slate-700 text-xs">{yen(b.average)}</strong>
                     </div>
                   )}
-                  <div>
-                    <span className="text-slate-400">前月差: </span>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-slate-400 block text-[10px]">前月差</span>
                     <strong
                       className={
-                        b.diffPrev <= 0 ? "text-emerald-600" : "text-rose-600"
+                        b.diffPrev <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"
                       }
                     >
                       {signedYen(b.diffPrev)}
                     </strong>
                   </div>
-                  <div>
-                    <span className="text-slate-400">前年差: </span>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-slate-400 block text-[10px]">前年差</span>
                     <strong
                       className={
-                        b.diffPrevYear <= 0 ? "text-emerald-600" : "text-rose-600"
+                        b.diffPrevYear <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"
                       }
                     >
                       {signedYen(b.diffPrevYear)}
@@ -563,7 +667,7 @@ export function Analytics({ data, ym, setYm }) {
         {/* 総資産ポートフォリオ */}
         <div className="min-w-0">
           <Card>
-            <h3 className="font-bold">総資産ポートフォリオ（銘柄・資産別）</h3>
+            <h3 className="font-bold text-slate-800 mb-3">総資産ポートフォリオ（銘柄・資産別）</h3>
             <Donut rows={assetPortfolio} title="資産構成" />
           </Card>
         </div>
@@ -578,24 +682,24 @@ export function Analytics({ data, ym, setYm }) {
                   : "全期間 実績推移"}
               </h3>
             </div>
-            <div className="grid gap-4 lg:grid-cols-2 min-w-0">
+            <div className="grid gap-5 lg:grid-cols-2 min-w-0">
               <Card>
-                <h3 className="font-bold">月間純貯蓄（収支）の推移</h3>
+                <h3 className="font-bold text-slate-800">月間純貯蓄（収支）の推移</h3>
                 <Chart data={netChart} color="bg-indigo-500" signed />
               </Card>
               <Card>
-                <h3 className="font-bold">総資産（現金 + 証券評価額）の推移</h3>
+                <h3 className="font-bold text-slate-800">総資産（現金 + 証券評価額）の推移</h3>
                 <Chart data={assetChart} color="bg-cyan-500" />
               </Card>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2 min-w-0">
+            <div className="grid gap-5 lg:grid-cols-2 min-w-0">
               <Card>
-                <h3 className="font-bold">収入推移</h3>
+                <h3 className="font-bold text-slate-800">収入推移</h3>
                 <Chart data={incomeChart} color="bg-emerald-500" />
               </Card>
               <Card>
-                <h3 className="font-bold">支出推移（固定費+臨時出費）</h3>
+                <h3 className="font-bold text-slate-800">支出推移（固定費+臨時出費）</h3>
                 <Chart data={spendingChart} color="bg-rose-500" />
               </Card>
             </div>

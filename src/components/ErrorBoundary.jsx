@@ -28,10 +28,11 @@ export class ErrorBoundary extends React.Component {
           window.firebaseDoc &&
           window.firebaseSetDoc
         ) {
+          const uid = window.firebaseUser?.uid;
+          const docPath = uid ? ["users", uid, "kakeibo_data", "main"] : ["kakeibo_data", "main_doc"];
           const docRef = window.firebaseDoc(
             window.firebaseDb,
-            "kakeibo_data",
-            "main_doc"
+            ...docPath
           );
           await window.firebaseSetDoc(docRef, normalize(null));
         }

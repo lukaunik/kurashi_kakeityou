@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { prevYM, nextYM } from '../utils/calculations.js';
 
 export const Card = ({ children, className = "" }) => (
@@ -66,12 +66,13 @@ export const Text = ({ value, onChange, placeholder = "" }) => (
 
 export function MonthPick({ ym, setYm }) {
   return (
-    <div className="inline-flex items-center gap-1">
+    <div className="inline-flex items-center gap-1.5">
       <button
         type="button"
         onClick={() => setYm(prevYM(ym))}
-        className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100"
+        className="flex items-center justify-center rounded-lg border border-slate-300 bg-white min-h-[44px] min-w-[44px] text-base font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 shadow-sm"
         title="前月へ"
+        aria-label="前月へ"
       >
         ‹
       </button>
@@ -80,14 +81,15 @@ export function MonthPick({ ym, setYm }) {
           type="month"
           value={ym}
           onChange={(e) => setYm(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-base sm:text-sm font-semibold"
+          className="rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px] text-base sm:text-sm font-bold bg-white shadow-sm outline-none focus:border-indigo-500"
         />
       </label>
       <button
         type="button"
         onClick={() => setYm(nextYM(ym))}
-        className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100"
+        className="flex items-center justify-center rounded-lg border border-slate-300 bg-white min-h-[44px] min-w-[44px] text-base font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 shadow-sm"
         title="翌月へ"
+        aria-label="翌月へ"
       >
         ›
       </button>
