@@ -4,13 +4,7 @@ import {
   blank,
   normalize,
 } from './utils/calculations.js';
-import {
-  getStoredFirebaseConfig,
-  initFirebase,
-  doc,
-  getDoc,
-  setDoc,
-} from './services/firebase.js';
+import { useFirebase, doc, getDoc, setDoc } from './services/FirebaseContext.jsx';
 import { FirebaseConfigModal } from './components/Modals.jsx';
 import { Settlement } from './pages/Settlement.jsx';
 import { Cashflow } from './pages/Cashflow.jsx';
@@ -19,20 +13,20 @@ import { Points } from './pages/Points.jsx';
 import { Settings } from './pages/Settings.jsx';
 
 export function App() {
-  const [isLoading, setIsLoading] = useState(true);
+  const { db, user, config, isLoading: isFirebaseLoading, saveConfig, error: firebaseError } = useFirebase();
   const [data, setData] = useState(() => normalize(null));
   const [ym, setYm] = useState(nowYM);
   const [tab, setTab] = useState("settlement");
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState("idle"); // 'idle' | 'saving' | 'saved' | 'error'
+
   const isInitialLoaded = useRef(false);
+  const savedTimerRef = useRef(null);
 
   const handleSaveFirebaseConfig = async (cfg) => {
     try {
-      localStorage.setItem("kakeibo_firebase_config", JSON.stringify(cfg));
-      const res = await initFirebase(cfg);
-      if (!res || !res.db || !res.user) {
-        throw new Error("Firebaseへの接続または匿名認証に失敗しました。設定とFirebase Console『匿名』認証の有効化をご確認ください。");
-      }
+      await saveConfig(cfg);
       setConfigModalOpen(false);
       window.location.reload();
     } catch (e) {
@@ -41,31 +35,21 @@ export function App() {
     }
   };
 
-  // 初回Firestoreデータ取得（UIDベースマルチユーザー対応）
+  // 初回Firestoreデータ取得（UIDベースマルチユーザー・旧パス読み込み完全廃止）
   useEffect(() => {
     let isMounted = true;
     const fetchInitialData = async () => {
+      if (isFirebaseLoading) return;
+
+      if (!config || !db || !user) {
+        if (isMounted) {
+          setIsDataLoading(false);
+          setConfigModalOpen(true);
+        }
+        return;
+      }
+
       try {
-        const config = getStoredFirebaseConfig();
-        if (!config) {
-          if (isMounted) {
-            setIsLoading(false);
-            setConfigModalOpen(true);
-          }
-          return;
-        }
-
-        const res = await initFirebase(config);
-        if (!res || !res.db || !res.user) {
-          console.error("Firebase初期化/認証失敗");
-          if (isMounted) {
-            setIsLoading(false);
-            setConfigModalOpen(true);
-          }
-          return;
-        }
-
-        const { db, user } = res;
         const docRef = doc(db, "users", user.uid, "kakeibo_data", "main");
         const docSnap = await getDoc(docRef);
 
@@ -76,18 +60,7 @@ export function App() {
             isInitialLoaded.current = true;
           }
         } else {
-          // 旧共有ドキュメント（kakeibo_data/main_doc）からのマイグレーションチェック
-          let initialData = normalize(null);
-          try {
-            const legacyRef = doc(db, "kakeibo_data", "main_doc");
-            const legacySnap = await getDoc(legacyRef);
-            if (legacySnap.exists()) {
-              initialData = normalize(legacySnap.data());
-            }
-          } catch (e) {
-            console.log("旧データチェックをスキップ:", e);
-          }
-
+          const initialData = normalize(null);
           await setDoc(docRef, initialData);
           if (isMounted) {
             setData(initialData);
@@ -98,7 +71,7 @@ export function App() {
         console.error("Firestoreからのデータ取得に失敗しました:", err);
       } finally {
         if (isMounted) {
-          setIsLoading(false);
+          setIsDataLoading(false);
         }
       }
     };
@@ -107,28 +80,34 @@ export function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [db, user, config, isFirebaseLoading]);
 
-  // データ更新時のFirestore非同期保存（デバウンス: 1000ms、UIDベースパス）
+  // データ更新時のFirestore非同期保存（デバウンス: 1000ms、ステータスバッジ連動）
   useEffect(() => {
-    if (!isInitialLoaded.current) return;
-    const currentDb = window.firebaseDb;
-    const currentUser = window.firebaseUser;
-    if (!currentDb || !currentUser) return;
+    if (!isInitialLoaded.current || !db || !user) return;
+
+    setSaveStatus("saving");
 
     const timer = setTimeout(async () => {
       try {
-        const docRef = doc(currentDb, "users", currentUser.uid, "kakeibo_data", "main");
+        const docRef = doc(db, "users", user.uid, "kakeibo_data", "main");
         await setDoc(docRef, data);
+        setSaveStatus("saved");
+
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => {
+          setSaveStatus("idle");
+        }, 3000);
       } catch (err) {
         console.error("Firestoreへの保存に失敗しました:", err);
+        setSaveStatus("error");
       }
     }, 1000);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [data]);
+  }, [data, db, user]);
 
   // バックアップ警告判定（7日以上経過）
   const showBackupAlert = useMemo(() => {
@@ -183,7 +162,33 @@ export function App() {
     ["settings", "設定"],
   ];
 
-  if (isLoading) {
+  const renderSaveBadge = () => {
+    if (saveStatus === "saving") {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-sumi-50 px-3 py-1 text-xs font-semibold text-sumi-700 animate-pulse border border-sumi-100">
+          <span className="h-2 w-2 rounded-full bg-sumi-600 animate-ping" />
+          保存中...
+        </span>
+      );
+    }
+    if (saveStatus === "saved") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-moss-400/20 px-3 py-1 text-xs font-semibold text-moss-500 border border-moss-400/20 transition-all">
+          ✓ 保存済み
+        </span>
+      );
+    }
+    if (saveStatus === "error") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-hanko-50 px-3 py-1 text-xs font-semibold text-hanko-500 border border-hanko-400/20">
+          ⚠ 保存失敗
+        </span>
+      );
+    }
+    return null;
+  };
+
+  if (isFirebaseLoading || isDataLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-paper text-ink-700">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-sumi-100 border-t-sumi-600"></div>
@@ -214,6 +219,9 @@ export function App() {
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-sumi-700 tracking-wider">
             くらし家計帳
           </h1>
+          <div className="flex items-center gap-3">
+            {renderSaveBadge()}
+          </div>
         </div>
 
         <nav className="flex items-center gap-6 overflow-x-auto max-w-full">
@@ -277,7 +285,7 @@ export function App() {
         isOpen={configModalOpen}
         onClose={() => setConfigModalOpen(false)}
         onSave={handleSaveFirebaseConfig}
-        canClose={!!(typeof window !== "undefined" && window.firebaseDb)}
+        canClose={!!db}
       />
     </div>
   );

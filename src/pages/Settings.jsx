@@ -1,4 +1,4 @@
-﻿import React, { useRef } from 'react';
+import React, { useRef } from 'react';
 import { Card, Text, Money, Decimal } from '../components/CommonUI.jsx';
 import {
   n,
@@ -9,6 +9,7 @@ import {
   generateId,
   escapeCSV,
 } from '../utils/calculations.js';
+import { useFirebase } from '../services/FirebaseContext.jsx';
 
 function Master({ title, headers, items, cells, onAdd, onRemove }) {
   return (
@@ -180,11 +181,13 @@ export function Settings({ data, setData, openConfigModal }) {
     reader.readAsText(file);
   };
 
+  const { db } = useFirebase();
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">設定・マスタ管理</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <h2 className="font-display text-2xl font-bold text-ink-900 tracking-wide">設定・マスタ管理</h2>
+        <p className="mt-1 text-xs text-ink-500">
           マスタデータ、起算日、エクスポートを管理します。
         </p>
       </div>
@@ -192,25 +195,23 @@ export function Settings({ data, setData, openConfigModal }) {
       <Card>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-bold flex items-center gap-2">
+            <h3 className="font-bold text-ink-900 text-sm flex items-center gap-2">
               <span>Firebase クラウド同期</span>
               <span
                 className={`inline-block h-2.5 w-2.5 rounded-full ${
-                  typeof window !== "undefined" && window.firebaseDb
-                    ? "bg-emerald-500"
-                    : "bg-amber-500"
+                  db ? "bg-moss-500" : "bg-hanko-500"
                 }`}
               ></span>
             </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              {typeof window !== "undefined" && window.firebaseDb
+            <p className="mt-1 text-xs text-ink-500">
+              {db
                 ? "クラウド（Firestore）に接続されています。"
                 : "Firebase設定が未設定または初期化エラーです。"}
             </p>
           </div>
           <button
             onClick={openConfigModal}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-50 shadow-sm"
+            className="rounded-xl border border-ink-900/15 bg-white px-3.5 py-2 text-xs font-bold text-ink-700 hover:bg-paper-100 shadow-sm transition-all"
           >
             設定を変更
           </button>
