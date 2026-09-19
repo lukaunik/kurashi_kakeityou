@@ -185,46 +185,57 @@ export function App() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 text-slate-600">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
-        <p className="mt-4 text-base font-bold">読み込み中...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-paper text-ink-700">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-sumi-100 border-t-sumi-600"></div>
+        <p className="mt-4 text-base font-bold font-display tracking-widest">読み込み中...</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 safe-bottom">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8 safe-bottom">
       {/* バックアップリマインダー */}
       {showBackupAlert && (
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          <span>
+        <div className="mb-6 flex items-center justify-between rounded-2xl border border-hanko-400/20 bg-hanko-50 p-4 text-sm text-hanko-600">
+          <span className="font-medium">
             ⚠️ データのバックアップが1週間以上行われていません。設定画面からJSON保存をおすすめします。
           </span>
           <button
             onClick={() => setTab("settings")}
-            className="font-bold underline ml-2"
+            className="font-bold underline ml-3 flex-shrink-0"
           >
             設定へ
           </button>
         </div>
       )}
 
-      <header className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <h1 className="text-2xl font-bold text-indigo-600">くらし家計帳</h1>
-        <nav className="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-200/60 p-1 max-w-full">
-          {tabs.map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`whitespace-nowrap flex-shrink-0 rounded-lg px-3 py-2 text-sm font-bold transition-all ${
-                tab === id
-                  ? "bg-white text-indigo-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      <header className="mb-8 border-b border-ink-900/10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-sumi-700 tracking-wider">
+            くらし家計帳
+          </h1>
+        </div>
+
+        <nav className="flex items-center gap-6 overflow-x-auto max-w-full">
+          {tabs.map(([id, label]) => {
+            const isActive = tab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`whitespace-nowrap pb-3 text-sm sm:text-base font-bold transition-all relative ${
+                  isActive
+                    ? "text-sumi-700"
+                    : "text-ink-500 hover:text-ink-900"
+                }`}
+              >
+                {label}
+                {isActive && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-sumi-600 rounded-full" />
+                )}
+              </button>
+            );
+          })}
         </nav>
       </header>
 
