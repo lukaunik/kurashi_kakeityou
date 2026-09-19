@@ -318,7 +318,7 @@ export function Analytics({ data, ym, setYm }) {
               </p>
             </div>
 
-            {/* PC用テーブル（高視認性デザイン: 右寄せ + font-mono + tabular-nums + 余白拡張 + ゼブラパターン） */}
+            {/* PC用テーブル */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead className="bg-slate-100/80 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
@@ -327,8 +327,10 @@ export function Analytics({ data, ym, setYm }) {
                     <th className="px-4 py-3 text-right">予算</th>
                     <th className="px-4 py-3 text-right">実績合計</th>
                     {mode !== "month" && <th className="px-4 py-3 text-right">月平均</th>}
-                    <th className="px-4 py-3 text-right">前月差</th>
-                    <th className="px-4 py-3 text-right">前年差</th>
+                    {mode === "month" && <th className="px-4 py-3 text-right">前月差</th>}
+                    {(mode === "month" || mode === "year") && (
+                      <th className="px-4 py-3 text-right">前年差</th>
+                    )}
                     <th className="px-4 py-3 text-right">達成率</th>
                   </tr>
                 </thead>
@@ -344,28 +346,32 @@ export function Analytics({ data, ym, setYm }) {
                         {mode !== "month" && (
                           <td className="px-4 py-3.5 text-right font-mono tabular-nums text-slate-600">{yen(c.average)}</td>
                         )}
-                        <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
-                          <span
-                            className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
-                              c.diffPrev <= 0
-                                ? "text-emerald-700 bg-emerald-50"
-                                : "text-rose-700 bg-rose-50"
-                            }`}
-                          >
-                            {signedYen(c.diffPrev)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
-                          <span
-                            className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
-                              c.diffPrevYear <= 0
-                                ? "text-emerald-700 bg-emerald-50"
-                                : "text-rose-700 bg-rose-50"
-                            }`}
-                          >
-                            {signedYen(c.diffPrevYear)}
-                          </span>
-                        </td>
+                        {mode === "month" && (
+                          <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
+                            <span
+                              className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
+                                c.diffPrev <= 0
+                                  ? "text-emerald-700 bg-emerald-50"
+                                  : "text-rose-700 bg-rose-50"
+                              }`}
+                            >
+                              {signedYen(c.diffPrev)}
+                            </span>
+                          </td>
+                        )}
+                        {(mode === "month" || mode === "year") && (
+                          <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
+                            <span
+                              className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
+                                c.diffPrevYear <= 0
+                                  ? "text-emerald-700 bg-emerald-50"
+                                  : "text-rose-700 bg-rose-50"
+                              }`}
+                            >
+                              {signedYen(c.diffPrevYear)}
+                            </span>
+                          </td>
+                        )}
                         <td className="px-4 py-3.5 text-right font-mono tabular-nums font-bold">
                           <span
                             className={`inline-block px-2 py-0.5 rounded text-xs ${
@@ -386,7 +392,7 @@ export function Analytics({ data, ym, setYm }) {
               </table>
             </div>
 
-            {/* スマホ用カード表示（視認性抜群・重なりゼロ） */}
+            {/* スマホ用カード表示 */}
             <div className="sm:hidden divide-y divide-slate-100">
               {categoryRows.map((c) => {
                 const targetBudget = p(c.budget) * (mode === "month" ? 1 : activeMonthCount);
@@ -427,19 +433,23 @@ export function Analytics({ data, ym, setYm }) {
                         </div>
                       )}
 
-                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <span className="text-slate-400 block text-[10px]">前月差</span>
-                        <strong className={c.diffPrev <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"}>
-                          {signedYen(c.diffPrev)}
-                        </strong>
-                      </div>
+                      {mode === "month" && (
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="text-slate-400 block text-[10px]">前月差</span>
+                          <strong className={c.diffPrev <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"}>
+                            {signedYen(c.diffPrev)}
+                          </strong>
+                        </div>
+                      )}
 
-                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <span className="text-slate-400 block text-[10px]">前年差</span>
-                        <strong className={c.diffPrevYear <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"}>
-                          {signedYen(c.diffPrevYear)}
-                        </strong>
-                      </div>
+                      {(mode === "month" || mode === "year") && (
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="text-slate-400 block text-[10px]">前年差</span>
+                          <strong className={c.diffPrevYear <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"}>
+                            {signedYen(c.diffPrevYear)}
+                          </strong>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -536,7 +546,7 @@ export function Analytics({ data, ym, setYm }) {
                 : "選択期間における項目ごとの設定予算、実績累計、月平均、達成率です。"}
             </p>
           </div>
-          {/* PC用テーブル表示 */}
+          {/* PC用テーブル */}
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead className="bg-slate-100/80 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
@@ -546,8 +556,10 @@ export function Analytics({ data, ym, setYm }) {
                   <th className="px-4 py-3 text-right">設定予算 (月額)</th>
                   <th className="px-4 py-3 text-right">{mode === "month" ? "今月実績額" : "実績合計"}</th>
                   {mode !== "month" && <th className="px-4 py-3 text-right">月平均</th>}
-                  <th className="px-4 py-3 text-right">前月差</th>
-                  <th className="px-4 py-3 text-right">前年差</th>
+                  {mode === "month" && <th className="px-4 py-3 text-right">前月差</th>}
+                  {(mode === "month" || mode === "year") && (
+                    <th className="px-4 py-3 text-right">前年差</th>
+                  )}
                   <th className="px-4 py-3 text-right">達成率</th>
                 </tr>
               </thead>
@@ -559,28 +571,32 @@ export function Analytics({ data, ym, setYm }) {
                     <td className="px-4 py-3.5 text-right font-mono tabular-nums text-slate-600">{yen(b.budget)}</td>
                     <td className="px-4 py-3.5 text-right font-mono tabular-nums font-semibold text-slate-900">{yen(b.totalAmount)}</td>
                     {mode !== "month" && <td className="px-4 py-3.5 text-right font-mono tabular-nums text-slate-600">{yen(b.average)}</td>}
-                    <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
-                      <span
-                        className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
-                          b.diffPrev <= 0
-                            ? "text-emerald-700 bg-emerald-50"
-                            : "text-rose-700 bg-rose-50"
-                        }`}
-                      >
-                        {signedYen(b.diffPrev)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
-                      <span
-                        className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
-                          b.diffPrevYear <= 0
-                            ? "text-emerald-700 bg-emerald-50"
-                            : "text-rose-700 bg-rose-50"
-                        }`}
-                      >
-                        {signedYen(b.diffPrevYear)}
-                      </span>
-                    </td>
+                    {mode === "month" && (
+                      <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
+                            b.diffPrev <= 0
+                              ? "text-emerald-700 bg-emerald-50"
+                              : "text-rose-700 bg-rose-50"
+                          }`}
+                        >
+                          {signedYen(b.diffPrev)}
+                        </span>
+                      </td>
+                    )}
+                    {(mode === "month" || mode === "year") && (
+                      <td className="px-4 py-3.5 text-right font-mono tabular-nums text-xs">
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded font-semibold ${
+                            b.diffPrevYear <= 0
+                              ? "text-emerald-700 bg-emerald-50"
+                              : "text-rose-700 bg-rose-50"
+                          }`}
+                        >
+                          {signedYen(b.diffPrevYear)}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 py-3.5 text-right font-mono tabular-nums font-bold">
                       <span
                         className={`inline-block px-2 py-0.5 rounded text-xs ${
@@ -638,26 +654,30 @@ export function Analytics({ data, ym, setYm }) {
                       <strong className="text-slate-700 text-xs">{yen(b.average)}</strong>
                     </div>
                   )}
-                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    <span className="text-slate-400 block text-[10px]">前月差</span>
-                    <strong
-                      className={
-                        b.diffPrev <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"
-                      }
-                    >
-                      {signedYen(b.diffPrev)}
-                    </strong>
-                  </div>
-                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    <span className="text-slate-400 block text-[10px]">前年差</span>
-                    <strong
-                      className={
-                        b.diffPrevYear <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"
-                      }
-                    >
-                      {signedYen(b.diffPrevYear)}
-                    </strong>
-                  </div>
+                  {mode === "month" && (
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">前月差</span>
+                      <strong
+                        className={
+                          b.diffPrev <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"
+                        }
+                      >
+                        {signedYen(b.diffPrev)}
+                      </strong>
+                    </div>
+                  )}
+                  {(mode === "month" || mode === "year") && (
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">前年差</span>
+                      <strong
+                        className={
+                          b.diffPrevYear <= 0 ? "text-emerald-600 text-xs" : "text-rose-600 text-xs"
+                        }
+                      >
+                        {signedYen(b.diffPrevYear)}
+                      </strong>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
