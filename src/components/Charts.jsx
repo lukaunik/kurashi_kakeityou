@@ -103,7 +103,7 @@ export function Chart({ data, color = "bg-indigo-500", signed = false }) {
   const minVal = hasNegative ? Math.min(...values, 0) : 0;
   const range = hasNegative ? maxVal - minVal || 1 : maxVal;
   const minChartWidth =
-    data.length > 5 ? `${Math.max(data.length * 44, 380)}px` : "100%";
+    data.length > 3 ? `${Math.max(data.length * 58, 320)}px` : "100%";
 
   if (!hasNegative) {
     return (
@@ -115,9 +115,9 @@ export function Chart({ data, color = "bg-indigo-500", signed = false }) {
           {data.map((x) => (
             <div
               key={x.label}
-              className="flex min-w-7 flex-1 flex-col items-center justify-end gap-1"
+              className="flex min-w-[52px] flex-1 flex-col items-center justify-end gap-1"
             >
-              <span className="text-[10px] text-slate-500 whitespace-nowrap">
+              <span className="text-[9px] sm:text-[10px] text-slate-500 whitespace-nowrap px-0.5">
                 {signed ? signedYen(x.value) : yen(x.value)}
               </span>
               <div
@@ -153,10 +153,10 @@ export function Chart({ data, color = "bg-indigo-500", signed = false }) {
           return (
             <div
               key={x.label}
-              className="flex min-w-7 flex-1 flex-col items-center justify-between h-full py-1"
+              className="flex min-w-[52px] flex-1 flex-col items-center justify-between h-full py-1"
             >
               <span
-                className={`text-[10px] whitespace-nowrap ${
+                className={`text-[9px] sm:text-[10px] whitespace-nowrap px-0.5 ${
                   isNeg
                     ? "font-bold text-rose-600"
                     : "font-semibold text-slate-600"
