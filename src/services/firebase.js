@@ -7,14 +7,7 @@ let auth = null;
 let currentUser = null;
 
 export function getStoredFirebaseConfig() {
-  if (
-    typeof window !== "undefined" &&
-    window.FIREBASE_CONFIG &&
-    window.FIREBASE_CONFIG.apiKey &&
-    window.FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY"
-  ) {
-    return window.FIREBASE_CONFIG;
-  }
+  // 1. LocalStorage の保存済み設定を最優先
   try {
     const stored = localStorage.getItem("kakeibo_firebase_config");
     if (stored) {
@@ -24,6 +17,17 @@ export function getStoredFirebaseConfig() {
   } catch (e) {
     console.error("Failed to parse stored firebase config:", e);
   }
+
+  // 2. window.FIREBASE_CONFIG のフォールバック
+  if (
+    typeof window !== "undefined" &&
+    window.FIREBASE_CONFIG &&
+    window.FIREBASE_CONFIG.apiKey &&
+    window.FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY"
+  ) {
+    return window.FIREBASE_CONFIG;
+  }
+
   return null;
 }
 
@@ -35,8 +39,16 @@ export async function initFirebase(config) {
 
     let user = auth.currentUser;
     if (!user) {
-      const userCred = await signInAnonymously(auth);
-      user = userCred.user;
+      try {
+        const userCred = await signInAnonymously(auth);
+        user = userCred.user;
+      } catch (authErr) {
+        console.error("Firebase 匿名認証エラー:", authErr);
+        if (authErr.code === "auth/operation-not-allowed") {
+          throw new Error("Firebase Console で『匿名認証 (Anonymous)』が有効になっていません。Authentication ＞ Sign-in method で『匿名』を有効にしてください。");
+        }
+        throw new Error(`Firebase 認証エラー: ${authErr.message || authErr}`);
+      }
     }
     currentUser = user;
 
@@ -52,8 +64,8 @@ export async function initFirebase(config) {
     }
     return { db, auth, user };
   } catch (err) {
-    console.error("Firebase初期化/認証エラー:", err);
-    return null;
+    console.error("Firebase初期化/接続エラー:", err);
+    throw err;
   }
 }
 

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 
 export function CopyModal({ isOpen, onClose, onCopy }) {
   const [options, setOptions] = useState({
@@ -137,10 +137,11 @@ export function FirebaseConfigModal({
 }) {
   const [rawJson, setRawJson] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handlePasteExtract = () => {
+  const handlePasteExtract = async () => {
     try {
       setError("");
       const text = rawJson.trim();
@@ -154,10 +155,14 @@ export function FirebaseConfigModal({
         );
       }
 
-      onSave(parsed);
+      setIsSubmitting(true);
+      await onSave(parsed);
       onClose();
     } catch (err) {
-      setError("設定の解析に失敗しました。正しい設定スニペットを入力してください。");
+      console.error(err);
+      setError(err.message || "接続または設定の保存に失敗しました。キーの内容およびFirebase Consoleの「匿名認証」設定を確認してください。");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -218,9 +223,10 @@ export function FirebaseConfigModal({
           )}
           <button
             onClick={handlePasteExtract}
-            className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-bold text-white shadow hover:bg-indigo-700"
+            disabled={isSubmitting}
+            className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
           >
-            接続して保存
+            {isSubmitting ? "接続中..." : "接続して保存"}
           </button>
         </div>
       </div>

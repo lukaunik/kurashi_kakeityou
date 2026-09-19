@@ -29,11 +29,15 @@ export function App() {
   const handleSaveFirebaseConfig = async (cfg) => {
     try {
       localStorage.setItem("kakeibo_firebase_config", JSON.stringify(cfg));
-      await initFirebase(cfg);
+      const res = await initFirebase(cfg);
+      if (!res || !res.db || !res.user) {
+        throw new Error("Firebaseへの接続または匿名認証に失敗しました。設定とFirebase Console『匿名』認証の有効化をご確認ください。");
+      }
       setConfigModalOpen(false);
       window.location.reload();
     } catch (e) {
       console.error(e);
+      throw e;
     }
   };
 
