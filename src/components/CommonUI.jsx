@@ -7,28 +7,14 @@ export const Card = ({ children, className = "" }) => (
   </section>
 );
 
-export const Stat = ({ label, value, tone = "" }) => {
-  const isCustomTone = Boolean(tone);
-  const isLightTone = tone.includes("bg-white") || tone.includes("bg-paper") || tone.includes("bg-sumi-50") || tone.includes("text-ink") || tone.includes("text-sumi");
-  const isDarkTone = isCustomTone && !isLightTone;
-
-  let valueColorClass = "text-ink-900";
-  if (isDarkTone) {
-    valueColorClass = "text-white";
-  } else if (tone.includes("text-sumi-700")) {
-    valueColorClass = "text-sumi-700";
-  } else if (tone.includes("text-ink-900")) {
-    valueColorClass = "text-ink-900";
-  }
-
-  let labelColorClass = isDarkTone ? "text-white/80" : "text-ink-500";
-  let barColorClass = isDarkTone ? "bg-white/40" : "bg-sumi-600";
+export const Stat = ({ label, value, tone = "", variant = "light" }) => {
+  const isDark = variant === "dark";
 
   return (
     <div className={`rounded-2xl p-5 ${tone || "border border-ink-900/10 bg-white"}`}>
-      <div className={`h-0.5 w-6 mb-2 rounded-full ${barColorClass}`} />
-      <p className={`text-xs font-semibold tracking-wide ${labelColorClass}`}>{label}</p>
-      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${valueColorClass}`}>{value}</p>
+      <div className={`h-0.5 w-6 mb-2 rounded-full ${isDark ? "bg-white/40" : "bg-sumi-600"}`} />
+      <p className={`text-xs font-semibold tracking-wide ${isDark ? "text-white/80" : "text-ink-500"}`}>{label}</p>
+      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${isDark ? "text-white" : "text-ink-900"}`}>{value}</p>
     </div>
   );
 };

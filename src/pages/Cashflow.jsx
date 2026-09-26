@@ -170,13 +170,15 @@ export function Cashflow({ data, m, put, putMany, ym, setYm }) {
         <Stat
           label="総収入"
           value={yen(income)}
-          tone="bg-sumi-600 text-white shadow-sm"
+          variant="dark"
+          tone="bg-sumi-600 shadow-sm"
         />
         <Stat label="支出合計（固定費+臨時）" value={yen(spending)} />
         <Stat
           label="月間純貯蓄（収入 − 支出）"
           value={signedYen(net)}
-          tone={net < 0 ? "bg-hanko-500 text-white shadow-sm" : "bg-sumi-700 text-white shadow-sm"}
+          variant="dark"
+          tone={net < 0 ? "bg-hanko-500 shadow-sm" : "bg-sumi-700 shadow-sm"}
         />
       </div>
 

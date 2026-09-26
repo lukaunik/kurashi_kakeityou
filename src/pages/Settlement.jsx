@@ -49,16 +49,18 @@ export function Settlement({ data, m, put, putMany, ym, setYm }) {
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="生活費合計" value={yen(life)} />
-        <Stat label="予算合計" value={yen(budget)} tone="border border-sumi-200/70 bg-sumi-50 text-sumi-700" />
+        <Stat label="予算合計" value={yen(budget)} tone="border border-sumi-200/70 bg-sumi-50" />
         <Stat
           label="回収対象額"
           value={yen(due)}
-          tone="bg-sumi-700 text-white shadow-sm"
+          variant="dark"
+          tone="bg-sumi-700 shadow-sm"
         />
         <Stat
           label="回収済み額"
           value={yen(m.recoveredAmount)}
-          tone="bg-moss-500 text-white shadow-sm"
+          variant="dark"
+          tone="bg-moss-500 shadow-sm"
         />
       </div>
 

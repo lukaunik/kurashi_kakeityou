@@ -13,7 +13,6 @@ export function Analytics({ data, ym, setYm }) {
 
   const {
     years,
-    activeMonthCount,
     comparisonData,
     total,
     avgLife,
@@ -103,7 +102,8 @@ export function Analytics({ data, ym, setYm }) {
                 : `回収対象額 (月平均: ${yen(avgDue)})`
             }
             value={yen(total.due)}
-            tone="bg-sumi-700 text-white shadow-sm"
+            variant="dark"
+            tone="bg-sumi-700 shadow-sm"
           />
           <Stat
             label={
@@ -112,7 +112,8 @@ export function Analytics({ data, ym, setYm }) {
                 : `実回収額 (月平均: ${yen(avgRecovered)})`
             }
             value={yen(total.recovered)}
-            tone="bg-moss-500 text-white shadow-sm"
+            variant="dark"
+            tone="bg-moss-500 shadow-sm"
           />
         </div>
 
@@ -147,7 +148,6 @@ export function Analytics({ data, ym, setYm }) {
           <CategoryBreakdownTable
             categoryRows={categoryRows}
             mode={mode}
-            activeMonthCount={activeMonthCount}
           />
           <Card>
             <h3 className="font-bold text-ink-900 text-sm mb-2">カテゴリ別生活費割合</h3>
@@ -170,18 +170,21 @@ export function Analytics({ data, ym, setYm }) {
           <Stat
             label="総収入"
             value={yen(total.income)}
-            tone="bg-sumi-600 text-white shadow-sm"
+            variant="dark"
+            tone="bg-sumi-600 shadow-sm"
           />
           <Stat label="支出合計（固定+臨時）" value={yen(total.spending)} />
           <Stat
             label="純貯蓄額（収入-支出）"
             value={signedYen(net)}
-            tone={net < 0 ? "bg-hanko-500 text-white shadow-sm" : "bg-ink-900 text-white shadow-sm"}
+            variant="dark"
+            tone={net < 0 ? "bg-hanko-500 shadow-sm" : "bg-ink-900 shadow-sm"}
           />
           <Stat
             label="最新総資産（現金+証券）"
             value={yen(assetTotal)}
-            tone="bg-sumi-700 text-white shadow-sm"
+            variant="dark"
+            tone="bg-sumi-700 shadow-sm"
           />
         </div>
 

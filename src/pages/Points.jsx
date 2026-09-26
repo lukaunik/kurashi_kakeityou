@@ -30,14 +30,16 @@ export function Points({ data, setData }) {
           value={`${regular.toLocaleString(undefined, {
             maximumFractionDigits: 1,
           })} mile`}
-          tone="bg-sumi-700 text-white shadow-sm"
+          variant="dark"
+          tone="bg-sumi-700 shadow-sm"
         />
         <Stat
           label="キャンペーン時の合計マイル"
           value={`${campaign.toLocaleString(undefined, {
             maximumFractionDigits: 1,
           })} mile`}
-          tone="bg-sumi-600 text-white shadow-sm"
+          variant="dark"
+          tone="bg-sumi-600 shadow-sm"
         />
       </div>
 

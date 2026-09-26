@@ -87,6 +87,8 @@ export function useAnalyticsStats({ data, ym, mode, year }) {
     return data.categories.map((c) => {
       const amount = rows.reduce((s, r) => s + p(r.ex[c.id]), 0);
       const average = amount / activeMonthCount;
+      const targetBudget = p(c.budget) * (mode === "month" ? 1 : activeMonthCount);
+      const rate = targetBudget > 0 ? (amount / targetBudget) * 100 : 0;
 
       const prevAmount = mode === "month" ? p(prevStats.ex[c.id]) : 0;
       const diffPrev = amount - prevAmount;
@@ -101,6 +103,8 @@ export function useAnalyticsStats({ data, ym, mode, year }) {
         ...c,
         amount,
         average,
+        targetBudget,
+        rate,
         diffPrev,
         diffPrevYear,
       };
