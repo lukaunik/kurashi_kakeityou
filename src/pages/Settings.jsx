@@ -13,31 +13,31 @@ import { useFirebase } from '../services/FirebaseContext.jsx';
 
 function Master({ title, headers, items, cells, onAdd, onRemove }) {
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="flex items-center justify-between p-4">
-        <h3 className="font-bold">{title}</h3>
+    <Card className="overflow-hidden p-0 border border-ink-900/10">
+      <div className="flex items-center justify-between p-4 border-b border-ink-900/10 bg-paper-100/50">
+        <h3 className="font-bold text-ink-900 text-sm">{title}</h3>
         <button
           onClick={onAdd}
-          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white shadow hover:bg-indigo-700"
+          className="rounded-xl bg-sumi-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sumi-700 transition-all"
         >
           ＋ 追加
         </button>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[650px] text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
+        <table className="w-full min-w-[650px] text-xs border-collapse">
+          <thead className="bg-paper-100 text-ink-700 font-bold border-b border-ink-900/10">
             <tr>
               {headers.map((x) => (
-                <th key={x} className="px-4 py-2">
+                <th key={x} className="px-4 py-3 text-left font-bold">
                   {x}
                 </th>
               ))}
               <th />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-ink-900/5">
             {items.map((item) => (
-              <tr key={item.id}>
+              <tr key={item.id} className="hover:bg-sumi-50/50 transition-colors">
                 {cells(item).map((cell, i) => (
                   <td key={i} className="px-4 py-2">
                     {cell}
@@ -49,7 +49,7 @@ function Master({ title, headers, items, cells, onAdd, onRemove }) {
                       if (confirm("この項目をマスタから削除しますか？"))
                         onRemove(item.id);
                     }}
-                    className="text-rose-600 hover:underline font-bold"
+                    className="rounded-xl px-3 py-1.5 text-xs font-bold text-hanko-500 hover:bg-hanko-50 transition-all"
                   >
                     削除
                   </button>
@@ -219,26 +219,26 @@ export function Settings({ data, setData, openConfigModal }) {
       </Card>
 
       <Card>
-        <h3 className="font-bold">バックアップ・データ出力</h3>
-        <p className="mt-1 text-sm text-slate-500">
+        <h3 className="font-bold text-ink-900 text-sm">バックアップ・データ出力</h3>
+        <p className="mt-1 text-xs text-ink-500">
           定期的なバックアップを推奨します（CSV出力はExcel等で閲覧可能）。
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2.5">
           <button
             onClick={exportJSON}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-indigo-700"
+            className="rounded-xl bg-sumi-600 px-4 py-2.5 min-h-[44px] text-xs font-bold text-white shadow-sm hover:bg-sumi-700 transition-all"
           >
             JSONバックアップを保存
           </button>
           <button
             onClick={exportCSV}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700"
+            className="rounded-xl bg-moss-500 px-4 py-2.5 min-h-[44px] text-xs font-bold text-white shadow-sm hover:bg-moss-600 transition-all"
           >
             CSVエクスポート
           </button>
           <button
             onClick={() => ref.current?.click()}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold hover:bg-slate-50"
+            className="rounded-xl border border-ink-900/15 bg-white px-4 py-2.5 min-h-[44px] text-xs font-bold text-ink-700 hover:bg-paper-100 shadow-sm transition-all"
           >
             JSON復元
           </button>
@@ -253,11 +253,11 @@ export function Settings({ data, setData, openConfigModal }) {
       </Card>
 
       <Card>
-        <h3 className="font-bold">起算日設定</h3>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="text-sm font-medium">
+        <h3 className="font-bold text-ink-900 text-sm">起算日設定</h3>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <label className="text-xs font-bold text-ink-700">
             精算の起算日
-            <div className="mt-1">
+            <div className="mt-1.5 flex items-center">
               <Money
                 small
                 value={data.settings.settlementStart}
@@ -268,12 +268,12 @@ export function Settings({ data, setData, openConfigModal }) {
                   }))
                 }
               />
-              <span className="ml-2 text-xs">日</span>
+              <span className="ml-2 text-xs font-bold text-ink-500">日</span>
             </div>
           </label>
-          <label className="text-sm font-medium">
+          <label className="text-xs font-bold text-ink-700">
             資金繰りの起算日
-            <div className="mt-1">
+            <div className="mt-1.5 flex items-center">
               <Money
                 small
                 value={data.settings.cashStart}
@@ -284,7 +284,7 @@ export function Settings({ data, setData, openConfigModal }) {
                   }))
                 }
               />
-              <span className="ml-2 text-xs">日</span>
+              <span className="ml-2 text-xs font-bold text-ink-500">日</span>
             </div>
           </label>
         </div>
@@ -310,7 +310,7 @@ export function Settings({ data, setData, openConfigModal }) {
             key="recovery"
             value={c.recovery}
             onChange={(e) => edit("categories", c.id, "recovery", e.target.value)}
-            className="rounded border border-slate-300 px-2 py-1.5"
+            className="rounded-xl border border-ink-900/15 bg-white px-3 py-2 text-xs font-bold text-ink-900 outline-none focus:border-sumi-600 focus:ring-2 focus:ring-sumi-100 transition-all cursor-pointer"
           >
             <option value="half">折半（50%）</option>
             <option value="full">全額（100%）</option>
@@ -360,7 +360,7 @@ export function Settings({ data, setData, openConfigModal }) {
             key="account"
             value={b.account}
             onChange={(e) => edit("bills", b.id, "account", e.target.value)}
-            className="rounded border border-slate-300 px-2 py-1.5 text-sm bg-white outline-none focus:border-indigo-500"
+            className="rounded-xl border border-ink-900/15 bg-white px-3 py-2 text-xs font-bold text-ink-900 outline-none focus:border-sumi-600 focus:ring-2 focus:ring-sumi-100 transition-all cursor-pointer"
           >
             {data.accounts.map((a) => (
               <option key={a.id} value={a.name}>

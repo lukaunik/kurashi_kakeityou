@@ -9,20 +9,36 @@ export const Card = ({ children, className = "" }) => (
 
 export const Stat = ({ label, value, tone = "" }) => {
   const isCustomTone = Boolean(tone);
+  const isLightTone = tone.includes("bg-white") || tone.includes("bg-paper") || tone.includes("bg-sumi-50") || tone.includes("text-ink") || tone.includes("text-sumi");
+  const isDarkTone = isCustomTone && !isLightTone;
+
+  let valueColorClass = "text-ink-900";
+  if (isDarkTone) {
+    valueColorClass = "text-white";
+  } else if (tone.includes("text-sumi-700")) {
+    valueColorClass = "text-sumi-700";
+  } else if (tone.includes("text-ink-900")) {
+    valueColorClass = "text-ink-900";
+  }
+
+  let labelColorClass = isDarkTone ? "text-white/80" : "text-ink-500";
+  let barColorClass = isDarkTone ? "bg-white/40" : "bg-sumi-600";
+
   return (
     <div className={`rounded-2xl p-5 ${tone || "border border-ink-900/10 bg-white"}`}>
-      <div className={`h-0.5 w-6 mb-2 rounded-full ${isCustomTone ? "bg-white/40" : "bg-sumi-600"}`} />
-      <p className={`text-xs font-semibold tracking-wide ${isCustomTone ? "text-white/80" : "text-ink-500"}`}>{label}</p>
-      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${isCustomTone ? "text-white" : "text-ink-900"}`}>{value}</p>
+      <div className={`h-0.5 w-6 mb-2 rounded-full ${barColorClass}`} />
+      <p className={`text-xs font-semibold tracking-wide ${labelColorClass}`}>{label}</p>
+      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${valueColorClass}`}>{value}</p>
     </div>
   );
 };
 
-// iOS Safari ズーム対策: text-base (16px) を適用
+// iOS Safari ズーム対策: text-base (16px) を適用、pattern="[0-9]*" でテンキーを確実に表示
 export const Money = ({ value, onChange, small = false }) => (
   <input
     type="number"
     min="0"
+    pattern="[0-9]*"
     inputMode="numeric"
     value={value ?? ""}
     placeholder="0"
@@ -35,6 +51,7 @@ export const Money = ({ value, onChange, small = false }) => (
 export const SignedMoney = ({ value, onChange, small = false }) => (
   <input
     type="number"
+    pattern="[0-9]*"
     inputMode="decimal"
     value={value ?? ""}
     placeholder="0"

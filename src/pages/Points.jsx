@@ -16,46 +16,51 @@ export function Points({ data, setData }) {
   const campaign = rows.reduce((s, x) => s + x.campaign, 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-bold">ポイント・マイル管理</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <h2 className="font-display text-2xl font-bold text-ink-900 tracking-wide">ポイント・マイル管理</h2>
+        <p className="mt-1 text-xs text-ink-500">
           ポイント残高 × 交換倍率でマイルを計算します。
         </p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <Stat
           label="通常交換での合計マイル"
           value={`${regular.toLocaleString(undefined, {
             maximumFractionDigits: 1,
           })} mile`}
-          tone="bg-slate-900 text-white"
+          tone="bg-sumi-700 text-white shadow-sm"
         />
         <Stat
           label="キャンペーン時の合計マイル"
           value={`${campaign.toLocaleString(undefined, {
             maximumFractionDigits: 1,
           })} mile`}
-          tone="bg-indigo-600 text-white"
+          tone="bg-sumi-600 text-white shadow-sm"
         />
       </div>
-      <Card className="overflow-hidden p-0">
+
+      <Card className="overflow-hidden p-0 border border-ink-900/10">
+        <div className="p-4 border-b border-ink-900/10 bg-paper-100/50">
+          <h3 className="font-bold text-ink-900 text-sm">ポイント別交換一覧</h3>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px] text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
+          <table className="w-full min-w-[650px] text-xs border-collapse">
+            <thead className="bg-paper-100 text-ink-700 font-bold border-b border-ink-900/10">
               <tr>
-                <th className="px-4 py-3">ポイント種別</th>
-                <th>現在残高</th>
-                <th>通常倍率</th>
-                <th>通常マイル</th>
-                <th className="px-4">キャンペーンマイル</th>
+                <th className="px-4 py-3 text-left font-bold">ポイント種別</th>
+                <th className="px-4 py-3 text-left font-bold">現在残高</th>
+                <th className="px-4 py-3 text-right font-bold">通常倍率</th>
+                <th className="px-4 py-3 text-right font-bold">通常マイル</th>
+                <th className="px-4 py-3 text-right font-bold">キャンペーンマイル</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-ink-900/5">
               {rows.map((x) => (
-                <tr key={x.id}>
-                  <td className="px-4 py-3 font-medium">{x.name}</td>
-                  <td>
+                <tr key={x.id} className="hover:bg-sumi-50/50 transition-colors">
+                  <td className="px-4 py-3 font-bold text-ink-900">{x.name}</td>
+                  <td className="px-4 py-2">
                     <Money
                       small
                       value={x.balance}
@@ -70,13 +75,13 @@ export function Points({ data, setData }) {
                       }
                     />
                   </td>
-                  <td>× {n(x.regularRate)}</td>
-                  <td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-ink-500">× {n(x.regularRate)}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-ink-900">
                     {x.regular.toLocaleString(undefined, {
                       maximumFractionDigits: 1,
                     })}
                   </td>
-                  <td className="px-4 font-bold text-indigo-700">
+                  <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-sumi-700">
                     {x.campaign.toLocaleString(undefined, {
                       maximumFractionDigits: 1,
                     })}
