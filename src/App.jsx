@@ -6,6 +6,7 @@ import {
 } from './utils/calculations.js';
 import { useFirebase, doc, getDoc, setDoc } from './services/FirebaseContext.jsx';
 import { FirebaseConfigModal } from './components/Modals.jsx';
+import { BackToTopButton } from './components/BackToTopButton.jsx';
 import { Settlement } from './pages/Settlement.jsx';
 import { Cashflow } from './pages/Cashflow.jsx';
 import { Analytics } from './pages/Analytics.jsx';
@@ -287,6 +288,7 @@ export function App() {
         onSave={handleSaveFirebaseConfig}
         canClose={!!db}
       />
+      <BackToTopButton />
     </div>
   );
 }
